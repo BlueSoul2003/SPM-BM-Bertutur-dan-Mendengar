@@ -1,0 +1,6 @@
+{
+  "name": "SPM Bahasa Melayu Speaking & Listening Prep",
+  "description": "Interactive speaking and listening examination practice for SPM Bahasa Melayu students featuring AI conversation tutor with real-time grammar feedback, mock SPM 1103/3 & 1103/4 exams with LPM scoring criteria, and tap-to-translate vocabulary tool.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
