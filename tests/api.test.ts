@@ -38,9 +38,12 @@ test('API account boundaries, unavailable AI and revocation against isolated dat
     assert.equal((await request('/api/auth/update-profile', { userId: 'legacy', studentName: 'Changed' }, token)).status, 403);
     assert.equal((await request('/api/auth/update-profile', { userId: user.id, studentName: 'Alice B' }, token)).status, 200);
     assert.equal((await request('/api/gemini/evaluate-speaking', { studentResponse: 'Saya suka membaca.', stimulusTopic: 'Membaca' })).status, 401);
+    const usageBefore=await (await request('/api/usage',undefined,token)).json();
     const unavailable = await request('/api/gemini/evaluate-speaking', { studentResponse: 'Saya suka membaca.', stimulusTopic: 'Membaca' }, token);
     assert.equal(unavailable.status, 503);
     assert.equal((await unavailable.json()).totalScore, undefined);
+    assert.deepEqual(await (await request('/api/usage',undefined,token)).json(),usageBefore);
+    assert.equal((await request('/api/usage')).status,401);
     assert.equal((await request('/api/auth/logout', {}, token)).status, 200);
     assert.equal((await request('/api/auth/me', undefined, token)).status, 401);
     const login = await request('/api/auth/login', { email: 'alice@example.test', password: 'long-password' });

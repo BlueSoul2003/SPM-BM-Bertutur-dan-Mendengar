@@ -11,7 +11,7 @@ import {PersistentSessions,accountRoutes,importLegacy,account} from '../server/a
 import {recordAttempt,listeningRoutes} from '../server/attempts.js';
 import {backup,restore} from '../server/backups.js';
 import {recoveryRoutes} from '../server/recovery.js';
-import {billingRoutes,aiQuota,premium} from '../server/billing.js';
+import {billingRoutes,premium} from '../server/billing.js';
 import {isListeningAnswerCorrect} from '../src/utils/listeningGrading.js';
 
 async function local(directory:string):Promise<Database>{const p=new PGlite(directory);await p.waitReady;return {query:(sql,args)=>p.query(sql,args),transaction:fn=>p.transaction(fn),close:()=>p.close()};}
@@ -46,7 +46,7 @@ test('durable transactions, replay prevention, recovery, webhook signatures and 
   const sent:string[]=[];
   const app=express();app.use(billing.webhook);app.use(express.json());app.use(router);app.use(billing.router);
   app.use(recoveryRoutes(db,async(_email,link)=>{sent.push(link);}));app.use(listeningRoutes(db,auth));
-  app.get('/quota',auth,aiQuota(db),(_req,res)=>res.json({ok:true}));
+
   app.use(((error:any,_req:any,res:any,_next:any)=>res.status(error.status||500).json({error:error.message})) as express.ErrorRequestHandler);
   const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
   const address=server.address() as any;
@@ -60,7 +60,7 @@ test('durable transactions, replay prevention, recovery, webhook signatures and 
     const answers={'q-1-1':'B. 25,000 orang murid','q-1-2':'15,000','q-1-3':true};
     const listening=await request('/attempts/listening',{attemptId:'12345678-1234-1234-1234-123456789012',trackId:'dengar-1',answers});
     const graded=await listening.json();assert.equal(graded.correctCount,3);assert.equal(graded.awarded,45);
-    assert.equal((await request('/quota')).status,200);assert.equal((await request('/quota')).status,200);assert.equal((await request('/quota')).status,429);
+
     const event={id:'evt_active',type:'customer.subscription.updated',data:{object:{id:'sub_fixture'}}};
     const payload=JSON.stringify(event);
     const postEvent=(payload:string,signature:string)=>fetch(`http://127.0.0.1:${address.port}/billing/webhook`,{method:'POST',headers:{'Content-Type':'application/json','stripe-signature':signature},body:payload});

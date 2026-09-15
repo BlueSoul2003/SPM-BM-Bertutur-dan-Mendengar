@@ -248,7 +248,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
     setIsPlayingAudio(false);
     setAudioPlayingText(null);
     setExamPage(3);
-    const initialSpeak = selectedTopic.speakingTimeSeconds || 180;
+    const initialSpeak = Math.min(selectedTopic.speakingTimeSeconds || 120,120);
     setSpeakTimeLeft(initialSpeak);
 
     // Auto-play the examiner question with native Malaysian voice after previous audio cleanup
@@ -264,6 +264,10 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       if (speakRemaining <= 0) {
         clearInterval(speakTimerRef.current);
         setSpeakTimeLeft(0);
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        setSpokenTranscript(normalizeMalayTranscript([baseTranscriptRef.current,finalTranscriptRef.current,interimTranscriptRef.current].filter(Boolean).join(' ')));
+        try { recognitionRef.current?.stop(); } catch { /* Already stopped. */ }
       } else {
         setSpeakTimeLeft(speakRemaining);
       }
@@ -272,6 +276,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
 
   // Toggle speech recording in Page 3
   const toggleRecording = () => {
+    if(speakTimeLeft<=0 && !isRecording)return;
     if (!recognitionRef.current) {
       setRecognitionError('Pelayar anda tidak menyokong rakaman suara. Sila gunakan Google Chrome atau taipkan jawapan anda.');
       return;

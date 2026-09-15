@@ -7,13 +7,14 @@ const columns:Record<string,string[]>={
   attempts:['id','user_id','kind','topic','input_hash','result','awarded','created_at'],
   rewards:['user_id','reward_key','points','created_at'],
   entitlements:['user_id','provider','subscription_id','valid_until','updated_at'],
+  ai_usage:['user_id','feature','input_hash','day','status','owner','lease_until','result'],
   payment_events:['id','processed_at'],imports:['source_hash','imported_at','count'],
 };
 export async function backup(db: Database,filename: string){
   const tables=await db.transaction(async tx=>{
     await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
     const data:Record<string,any[]>={};
-    for(const table of Object.keys(columns))data[table]=(await tx.query(`SELECT * FROM ${table}`)).rows;
+    for(const table of Object.keys(columns))data[table]=(await tx.query(`SELECT * FROM ${table}${table==='ai_usage'?" WHERE status='done'":''}`)).rows;
     return data;
   });
   const payload=JSON.stringify({version:1,createdAt:new Date().toISOString(),tables});
@@ -29,6 +30,7 @@ export async function restore(db: Database,filename: string){
   await db.transaction(async tx=>{
     for(const table of [...Object.keys(columns),'sessions','reset_tokens'])if((await tx.query(`SELECT 1 FROM ${table} LIMIT 1`)).rows.length)throw new Error('Restore requires an empty target database');
     for(const [table,keys] of Object.entries(columns)){
+      if(table==='ai_usage' && data.tables[table]===undefined)data.tables[table]=[];
       if(!Array.isArray(data.tables[table]))throw new Error('Invalid backup table');
       for(const row of data.tables[table]){
         const values=keys.map(k=>['profile','last_grade','result'].includes(k)&&row[k]!==null?JSON.stringify(row[k]):row[k]);

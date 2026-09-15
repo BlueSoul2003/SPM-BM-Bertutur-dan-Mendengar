@@ -6,18 +6,6 @@ import { account, route, malaysiaDay, digest } from './accounts.js';
 export async function premium(db: Database,userId: string) {
   return Boolean((await db.query('SELECT 1 FROM entitlements WHERE user_id=$1 AND valid_until>now()',[userId])).rows.length);
 }
-export function aiQuota(db: Database): RequestHandler {
-  return route(async(req,res,next)=>{
-    const isPremium=await premium(db,res.locals.userId);
-    const limit=Number(process.env[isPremium?'PREMIUM_AI_DAILY_LIMIT':'FREE_AI_DAILY_LIMIT']|| (isPremium?100:10));
-    if(!Number.isSafeInteger(limit)||limit<0)throw new Error('Invalid AI quota configuration');
-    const key=`quota:${res.locals.userId}:${malaysiaDay()}`;
-    const hits=(await db.query(`INSERT INTO rate_buckets VALUES($1,1,now()+interval '2 days') ON CONFLICT(bucket) DO UPDATE SET hits=rate_buckets.hits+1 RETURNING hits`,[key])).rows[0].hits;
-    if(hits>limit)return res.status(429).json({error:'Had penggunaan AI harian telah dicapai. Sila cuba lagi esok.',code:'DAILY_QUOTA_EXCEEDED'});
-    next();
-  });
-}
-
 /** Current subscription is retrieved under an account lock; delayed events cannot restore stale access. */
 export async function applySubscriptionEvent(db: Database, event: Stripe.Event, stripe: Stripe) {
   const object:any=event.data.object;

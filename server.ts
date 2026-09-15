@@ -1,4 +1,5 @@
-import { billingRoutes, aiQuota } from './server/billing.js';
+import { metered, usageStatus, type AiFeature } from './server/usage.js';
+import { billingRoutes } from './server/billing.js';
 import { recoveryRoutes } from './server/recovery.js';
 import express from 'express';
 import path from 'path';
@@ -64,8 +65,7 @@ app.use('/api',route(async(req,res,next)=>(await routesReady).router(req,res,nex
 const listeningReady = routesReady.then(({db,auth})=>listeningRoutes(db,auth));
 app.use('/api',route(async(req,res,next)=>(await listeningReady)(req,res,next)));
 
-const quotaReady=databaseReady.then(db=>aiQuota(db));
-app.use(['/api/gemini','/api/tts'],route(async(req,res,next)=>(await quotaReady)(req,res,next)));
+app.get('/api/usage', authenticated, route(async (_req,res)=>res.json(await usageStatus(await databaseReady,res.locals.userId))));
 
 // Lazy initializer for Gemini API client
 let aiClient: GoogleGenAI | null = null;
@@ -95,23 +95,31 @@ const FAST_GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-flash-latest').
 
 async function generateWithModelFallback(
   ai: GoogleGenAI,
-  requestOptions: { contents: any; config?: any }
+  requestOptions: { contents: any; config?: any },
+  userId: string, feature: AiFeature
 ) {
+  return metered(await databaseReady,userId,feature,JSON.stringify([FAST_GEMINI_MODELS,requestOptions]),async()=>{
   let lastError: any = null;
   for (const model of FAST_GEMINI_MODELS) {
     try {
       const response = await ai.models.generateContent({
         model,
         contents: requestOptions.contents,
-        config: requestOptions.config,
+        config: { ...requestOptions.config, maxOutputTokens: 4096 },
       });
-      return response;
+      const parsed = JSON.parse(response.text || '{}');
+      if (feature === 'chat' && (typeof parsed.reply !== 'string' || !parsed.reply.trim() || !parsed.grammarAnalysis)) throw new Error('Invalid chat response');
+      if (feature === 'speaking' && (!Number.isInteger(parsed.totalScore) || parsed.totalScore < 0 || parsed.totalScore > 40 || parsed.maxScore !== 40 || !parsed.rubricBreakdown)) throw new Error('Invalid assessment response');
+      if (feature === 'dictionary' && typeof parsed.definitions?.ms !== 'string') throw new Error('Invalid dictionary response');
+      if (feature === 'feedback' && (typeof parsed.isCorrect !== 'boolean' || typeof parsed.feedback !== 'string')) throw new Error('Invalid feedback response');
+      return { text: response.text };
     } catch (err: any) {
       lastError = err;
       console.warn(`[Gemini Fallback] Model ${model} failed:`, err?.message?.slice(0, 100) || err);
     }
   }
   throw lastError;
+  });
 }
 
 // In-memory dictionary cache to provide sub-millisecond responses and ensure consistency
@@ -129,7 +137,7 @@ app.get('/api/tts', async (req, res) => {
     if (!text || text.length > 5000) {
       return res.status(400).send('Parameter teks diperlukan.');
     }
-    const audioBuffer = await getMalayAudioBuffer(text);
+    const audioBuffer = Buffer.from(await metered(await databaseReady,res.locals.userId,'audio',text,async()=>(await getMalayAudioBuffer(text)).toString('base64')),'base64');
     res.set({
       'Content-Type': 'audio/mpeg',
       'Content-Length': audioBuffer.length.toString(),
@@ -137,6 +145,7 @@ app.get('/api/tts', async (req, res) => {
     });
     res.send(audioBuffer);
   } catch (err: any) {
+    if(err?.status===429)return res.status(429).json({error:err.message,code:err.code});
     console.error('TTS provider unavailable');
     res.status(503).send('Audio awan tidak tersedia. Cuba suara peranti.');
   }
@@ -149,7 +158,7 @@ app.post('/api/tts', async (req, res) => {
     if (!text || text.length > 5000) {
       return res.status(400).send('Parameter teks diperlukan.');
     }
-    const audioBuffer = await getMalayAudioBuffer(text);
+    const audioBuffer = Buffer.from(await metered(await databaseReady,res.locals.userId,'audio',text,async()=>(await getMalayAudioBuffer(text)).toString('base64')),'base64');
     res.set({
       'Content-Type': 'audio/mpeg',
       'Content-Length': audioBuffer.length.toString(),
@@ -157,6 +166,7 @@ app.post('/api/tts', async (req, res) => {
     });
     res.send(audioBuffer);
   } catch (err: any) {
+    if(err?.status===429)return res.status(429).json({error:err.message,code:err.code});
     console.error('TTS provider unavailable');
     res.status(503).send('Audio awan tidak tersedia. Cuba suara peranti.');
   }
@@ -166,6 +176,7 @@ app.post('/api/tts', async (req, res) => {
 app.post('/api/gemini/chat', async (req, res) => {
   try {
     const { messages, tutorStyle = 'cikgu_ramah', topic } = req.body;
+    if (!Array.isArray(messages) || messages.length<1 || messages.length>20 || messages.some(m=>!m || !['user','assistant'].includes(m.role) || typeof m.content!=='string' || m.content.length>4000)) return res.status(400).json({error:'Perbualan terlalu panjang atau tidak sah.'});
     const ai = getAIClient();
 
     if (!ai) return res.status(503).json({error:'Cikgu AI belum tersedia.'});
@@ -216,11 +227,12 @@ Sila kembalikan respons dalam format JSON dengan struktur:
         responseMimeType: 'application/json',
         temperature: 0.7,
       }
-    });
+    }, res.locals.userId, 'chat');
 
     const parsed = JSON.parse(response.text || '{}');
     res.json(parsed);
   } catch (error: any) {
+    if(error?.status===429)return res.status(429).json({error:error.message,code:error.code});
     console.error('Chat error:', error);
     res.status(500).json({ error: error.message || 'Ralat memproses perbualan AI' });
   }
@@ -316,7 +328,7 @@ Rujukan Skema Asas yang diterima:
         responseMimeType: 'application/json',
         temperature: 0.3,
       }
-    });
+    }, res.locals.userId, 'speaking');
 
     const parsed = JSON.parse(response.text || '{}');
     if (!parsed.exemplarAnswer || parsed.exemplarAnswer.length < 60) {
@@ -325,6 +337,7 @@ Rujukan Skema Asas yang diterima:
     if (!Number.isInteger(parsed.totalScore) || parsed.totalScore<0 || parsed.totalScore>40 || parsed.maxScore!==40 || !parsed.rubricBreakdown) throw new Error('Invalid assessment output');
     res.json(await recordAttempt(db,res.locals.userId,id,'speaking',topicId||stimulusTopic,inputHash,parsed,50+(parsed.totalScore>=32?25:0)));
   } catch (error: any) {
+    if(error?.status===429)return res.status(429).json({error:error.message,code:error.code});
     console.error('Evaluate speaking error:', error);
     res.status(503).json({ error: 'Penilaian AI tidak tersedia. Sila cuba lagi.' });
   }
@@ -401,7 +414,7 @@ Format WAJIB JSON:
             responseMimeType: 'application/json',
             temperature: 0.2,
           }
-        });
+        }, res.locals.userId, 'dictionary');
 
         const parsed = JSON.parse(response.text || '{}');
         if (parsed && parsed.definitions && parsed.definitions.ms) {
@@ -490,6 +503,7 @@ Format WAJIB JSON:
     serverDictCache.set(cleanWord, defaultEntry);
     res.json(defaultEntry);
   } catch (error: any) {
+    if(error?.status===429)return res.status(429).json({error:error.message,code:error.code});
     console.error('Dictionary error:', error);
     res.status(500).json({ error: error.message || 'Ralat mencari takrifan perkataan' });
   }
@@ -535,11 +549,12 @@ Skema / Jawapan Disasarkan: ${expectedAnswer || 'N/A'}`;
         responseMimeType: 'application/json',
         temperature: 0.2,
       }
-    });
+    }, res.locals.userId, 'feedback');
 
     const parsed = JSON.parse(response.text || '{}');
     res.json(parsed);
   } catch (error: any) {
+    if(error?.status===429)return res.status(429).json({error:error.message,code:error.code});
     console.error('Exercise feedback error:', error);
     res.status(500).json({ error: error.message || 'Ralat memeriksa latihan' });
   }

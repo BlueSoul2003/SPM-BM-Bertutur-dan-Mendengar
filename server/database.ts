@@ -66,6 +66,11 @@ export async function migrate(db: Database) {
     await tx.query(`CREATE TABLE IF NOT EXISTS reset_tokens (
       token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES accounts(id), expires_at timestamptz NOT NULL)`);
     await tx.query(`CREATE TABLE IF NOT EXISTS imports (source_hash text PRIMARY KEY, imported_at timestamptz NOT NULL DEFAULT now(), count integer NOT NULL)`);
-    await tx.query(`INSERT INTO schema_versions(version) VALUES (1) ON CONFLICT DO NOTHING`);
+    await tx.query(`CREATE TABLE IF NOT EXISTS ai_usage (
+      user_id text NOT NULL REFERENCES accounts(id), feature text NOT NULL, input_hash text NOT NULL,
+      day text NOT NULL, status text NOT NULL CHECK(status IN ('pending','done')), owner text NOT NULL,
+      lease_until timestamptz NOT NULL, result jsonb, PRIMARY KEY(user_id,feature,input_hash))`);
+    await tx.query(`CREATE INDEX IF NOT EXISTS ai_usage_day ON ai_usage(day,user_id,feature)`);
+    await tx.query(`INSERT INTO schema_versions(version) VALUES (1),(2) ON CONFLICT DO NOTHING`);
   });
 }
