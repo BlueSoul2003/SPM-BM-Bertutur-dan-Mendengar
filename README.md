@@ -67,3 +67,9 @@ Backup files contain personal data and password hashes: store them privately wit
 - `server/tts.ts`, `src/services/api.ts`: bounded provider calls and browser transport.
 
 This revision is delivered as source code in the development fork; it has not been deployed to production. Real SMTP, Stripe, AI/audio, managed PostgreSQL, mobile microphone behavior and host-specific load tests require configured services. Review any tracked legacy user JSON for personal data before publishing the repository.
+
+## Shareable preview deployment
+
+The prepared Netlify project is `bual-spm-preview`. The user approved public hosting with account/progress storage. Deployment reached database provisioning, but Netlify returned `database feature not available for this account`. No working public website has been verified yet; selection of an external PostgreSQL database is pending.
+
+`netlify.toml` builds only frontend assets with `npm run build:site`. `/api/*` is handled by the modern Netlify function using the same Express application. Set `DATABASE_URL` as a secret in Netlify's function environment and apply `scripts/deploy-schema.sql` to the selected empty PostgreSQL schema before deploying. Do not put the connection string in source code. The Netlify-specific database SDK has been removed because this account cannot provision it. Keep the local `migrate()` schema and deploy SQL aligned when making future schema changes. Preserve `STUDENT_DIRECT_MODE=true` for this preview, leave payment/SMTP/AI credentials absent, and test with synthetic accounts before inviting students.

@@ -311,6 +311,7 @@ export default function App() {
 
   return (
     <div className="bm-app min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-amber-100 selection:text-amber-900">
+      <div className="bg-[#f6e7ec] text-[#713047] px-4 py-2 text-center text-xs leading-relaxed">Versi percubaan · Akaun, latihan mendengar dan kemajuan tersedia. Penilaian AI belum dibuka.</div>
       {/* Top Navbar (Only shown after login/registration) */}
       {userProgress.isRegistered && (
         <Navbar

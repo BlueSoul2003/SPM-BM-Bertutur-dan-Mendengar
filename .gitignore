@@ -10,3 +10,5 @@ coverage/
 .codex-tmp/
 
 data/postgres/
+
+.netlify/
