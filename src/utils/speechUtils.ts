@@ -1,3 +1,4 @@
+import { apiFetch } from '../services/api';
 // Authentic Malaysian Bahasa Melayu Audio Player & Web Speech Engine
 
 export interface SpeechRecognitionResultState {
@@ -155,20 +156,9 @@ export function speakMalayText(
     fallbackBrowserSpeech(cleanText, finish, rate, pitch);
   };
 
-  // If text is under 400 characters, stream via GET
-  if (cleanText.length <= 400) {
-    const encoded = encodeURIComponent(cleanText);
-    audio.src = `/api/tts?text=${encoded}`;
-    audio.play().catch((err) => {
-      if (isCancelled || hasEnded || currentAudioPlayer !== audio || err.name === 'AbortError') {
-        return;
-      }
-      console.warn('Audio play was interrupted or blocked:', err);
-      fallbackBrowserSpeech(cleanText, finish, rate, pitch);
-    });
-  } else {
-    // For longer scripts, use POST to avoid URL length limitations
-    fetch('/api/tts', {
+  {
+    // Fetch all audio with the bearer token; media URLs cannot attach headers.
+    apiFetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: cleanText }),

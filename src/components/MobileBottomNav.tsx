@@ -20,12 +20,12 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   const tabs = [
     {
       id: 'speaking' as ActiveTab,
-      label: 'Bertutur (1103/3)',
+      label: 'Bertutur',
       icon: Mic,
     },
     {
       id: 'listening' as ActiveTab,
-      label: 'Mendengar (1103/4)',
+      label: 'Mendengar',
       icon: Headphones,
     },
     {
@@ -44,7 +44,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       id="mobile-bottom-nav"
-      className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 py-1 flex justify-around items-center shadow-lg"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 py-1 flex justify-around items-center shadow-lg"
       style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom))' }}
       aria-label="Navigasi Mudah Alih"
     >
@@ -55,6 +55,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         return (
           <button
             key={tab.id}
+            aria-current={isActive ? 'page' : undefined}
             id={`mobile-nav-${tab.id}`}
             onClick={() => {
               if (!isRegistered && onOpenAuthModal) {

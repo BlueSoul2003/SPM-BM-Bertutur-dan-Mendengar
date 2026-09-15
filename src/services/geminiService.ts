@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 import {
   ChatMessage,
   SpeakingAssessmentResult,
@@ -20,7 +21,7 @@ export async function sendChatMessageToAI(
   topic: string
 ): Promise<{ reply: string; grammarAnalysis?: any }> {
   try {
-    const res = await fetch('/api/gemini/chat', {
+    const res = await apiFetch('/api/gemini/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -37,22 +38,7 @@ export async function sendChatMessageToAI(
     const data = await res.json();
     return data;
   } catch (err) {
-    console.warn('Fallback chat used:', err);
-    // Intelligent fallback
-    const lastUserMsg = messages[messages.length - 1]?.content || '';
-    return {
-      reply: `Bagus perkongsian anda mengenai "${lastUserMsg.slice(0, 40)}...". Dalam konteks peperiksaan SPM, huraian anda boleh diperkukuh dengan mengemukakan contoh yang lebih konkrit dan impak kepada masyarakat. Bagaimanakah anda melihat peranan institusi keluarga dalam hal ini?`,
-      grammarAnalysis: {
-        hasErrors: false,
-        corrections: [],
-        elevatedVocabulary: [
-          { original: "sangat penting", suggestion: "maslahat / mustahak / signifikan", context: "Memantapkan impak huraian idea" },
-          { original: "bekerjasama", suggestion: "berganding bahu / bersinergi", context: "Penggunaan ungkapan aras tinggi" }
-        ],
-        proverbs: ["Bagai aur dengan tebing", "Di mana ada kemahuan, di situ ada jalan"],
-        fluencyTip: "Pastikan intonasi ayat penyata menurun pada hujung ayat dan jeda 1 saat pada setiap noktah."
-      }
-    };
+    return {reply:'Cikgu AI tidak tersedia buat masa ini. Sila cuba lagi sebentar atau semak had penggunaan harian anda.'};
   }
 }
 
@@ -72,7 +58,7 @@ export async function evaluateSpeakingResponse(
   );
 
   try {
-    const res = await fetch('/api/gemini/evaluate-speaking', {
+    const res = await apiFetch('/api/gemini/evaluate-speaking', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,54 +81,7 @@ export async function evaluateSpeakingResponse(
     }
     return data;
   } catch (err) {
-    console.warn('Fallback evaluation used:', err);
-    const wordCount = studentResponse.trim().split(/\s+/).length;
-    const baseScore = Math.min(38, Math.max(22, Math.floor(wordCount / 5) + 20));
-    
-    return {
-      totalScore: baseScore,
-      maxScore: 40,
-      band: baseScore >= 33 ? 'Cemerlang (33 - 40)' : baseScore >= 25 ? 'Kepujian (25 - 32)' : 'Memuaskan (17 - 24)',
-      rubricBreakdown: {
-        tatabahasaKosaKata: {
-          score: Math.round(baseScore * 0.25),
-          max: 10,
-          feedback: 'Tatabahasa tepat dengan struktur ayat majmuk yang gramatis serta pemilihan kosa kata bersesuaian.'
-        },
-        sebutanIntonasi: {
-          score: Math.round(baseScore * 0.25),
-          max: 10,
-          feedback: 'Sebutan baku jelas dan intonasi bersahaja mengikut laras bahasa formal.'
-        },
-        kefasihanKelancaran: {
-          score: Math.round(baseScore * 0.25),
-          max: 10,
-          feedback: 'Pertuturan teratur tanpa teragak-agak atau pengulangan idea yang berlebihan.'
-        },
-        pengolahanIdea: {
-          score: Math.round(baseScore * 0.25),
-          max: 10,
-          feedback: 'Idea disampaikan dengan matang dan berfokus tepat kepada soalan yang ditanya.'
-        }
-      },
-      strengths: [
-        'Penyampaian idea berfokus dan menjawab soalan pentaksir secara terus',
-        'Keyakinan bertutur dalam laras bahasa Melayu standard'
-      ],
-      improvements: [
-        'Perbanyakkan penggunaan peribahasa SPM yang tepat untuk memperindah wacana',
-        'Tingkatkan kosa kata aras tinggi seperti "maslahat", "obligasi", "sinergi"'
-      ],
-      grammarErrors: [
-        {
-          original: 'daripada aspek',
-          corrected: 'dari segi / dari sudut / daripada aspek fizikal',
-          rule: 'Gunakan "dari" untuk arah, tempat dan masa/sudut pandang. "Daripada" untuk punca, asal kejadian dan perbandingan.'
-        }
-      ],
-      exemplarAnswer: modelAnswer,
-      examinerSummary: 'Calon menunjukkan potensi lisan yang meyakinkan dan berupaya mengemukakan hujah yang menepati soalan pentaksir.'
-    };
+    throw new Error('Penilaian AI tidak tersedia. Jawapan anda dikekalkan; sila cuba lagi.');
   }
 }
 
@@ -173,7 +112,7 @@ export async function lookupDictionaryWord(
 
   // 3. Query backend Gemini API for accurate, context-aware dictionary definitions
   try {
-    const res = await fetch('/api/gemini/dictionary', {
+    const res = await apiFetch('/api/gemini/dictionary', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -306,7 +245,7 @@ export async function submitExerciseAnswer(
   expectedAnswer?: string
 ): Promise<{ isCorrect: boolean; score: number; feedback: string; explanation: string }> {
   try {
-    const res = await fetch('/api/gemini/exercise-feedback', {
+    const res = await apiFetch('/api/gemini/exercise-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -62,8 +62,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (!password || password.length < 4) {
-      setErrorMessage('Sila masukkan kata laluan sekurang-kurangnya 4 aksara.');
+    if (!password || password.length < (mode === 'register' ? 8 : 4)) {
+      setErrorMessage('Sila masukkan kata laluan sekurang-kurangnya 8 aksara untuk akaun baharu.');
       return;
     }
 
@@ -225,7 +225,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={4}
+                minLength={mode === 'register' ? 8 : 4}
+                maxLength={256}
                 placeholder="Masukkan kata laluan"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
               />

@@ -1,11 +1,16 @@
+import { billingRoutes, aiQuota } from './server/billing.js';
+import { recoveryRoutes } from './server/recovery.js';
 import express from 'express';
 import path from 'path';
-import fs from 'fs';
-import https from 'https';
+import { openDatabase, migrate } from './server/database.js';
+import { PersistentSessions, accountRoutes, sharedRateLimit, route, importLegacy, digest } from './server/accounts.js';
+import { listeningRoutes, cachedAttempt, recordAttempt } from './server/attempts.js';
+import { getMalayAudioBuffer } from './server/tts.js';
 import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
+import { Sessions, bearer, requireSession, rateLimit, concurrencyLimit, hashPassword, verifyPassword } from './server/security.js';
 import { BUILTIN_DICTIONARY } from './src/data/spmTopics.js';
 import { KAMUS_SPM_LENGKAP } from './src/data/kamusData.js';
 import { getSpeakingModelAnswer } from './src/data/spmModelAnswers.js';
@@ -18,21 +23,64 @@ const MASTER_SERVER_DICT: Record<string, any> = {
 };
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
+const databaseReady = openDatabase().then(async db => {
+  await migrate(db);
+  if (process.env.IMPORT_LEGACY_JSON === 'true') await importLegacy(db, path.join(process.env.DATA_DIR || 'data','users.json'));
+  return db;
+});
+const routesReady = databaseReady.then(db => { const sessions=new PersistentSessions(db); return {...accountRoutes(db,sessions),db}; });
+const authenticated = route(async(req,res,next) => (await routesReady).auth(req,res,next));
+const sharedLimit = (scope: string,max: number,seconds: number) => {
+  const handler=databaseReady.then(db=>sharedRateLimit(db,scope,max,seconds));
+  return route(async(req,res,next)=>(await handler)(req,res,next));
+};
+app.disable('x-powered-by');
+app.use('/api', sharedLimit('api',240,60));
 
-app.use(express.json({ limit: '10mb' }));
+const billingReady=routesReady.then(({db,auth})=>billingRoutes(db,auth));
+app.use('/api',route(async(req,res,next)=>(await billingReady).webhook(req,res,next)));
+app.use(express.json({ limit: '64kb' }));
+app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
+app.use(['/api/auth/register', '/api/auth/login'], sharedLimit('auth',20,900), concurrencyLimit(4));
+app.use(['/api/gemini', '/api/tts'], authenticated, sharedLimit('ai',30,60), concurrencyLimit(8));
+app.use(['/api/auth/update-profile', '/api/auth/sync-progress', '/api/leaderboard/sync'], authenticated);
+app.use(['/api/admin/clear-all', '/api/leaderboard/reset', '/api/auth/google'], (_req, res) => { res.status(403).json({ error: 'Endpoint tidak tersedia.' }); });
+
+app.use('/api', (req, res, next) => {
+  const body = req.body;
+  if (body && (typeof body !== 'object' || Array.isArray(body))) return res.status(400).json({ error: 'Permintaan tidak sah.' });
+  for (const key of ['email', 'username', 'identifier', 'password', 'studentName', 'schoolName', 'state', 'avatar', 'name', 'school', 'text']) {
+    if (body?.[key] !== undefined && (typeof body[key] !== 'string' || body[key].length > (key === 'text' ? 5000 : 256))) return res.status(400).json({ error: 'Medan tidak sah.' });
+  }
+  next();
+});
+
+app.use(['/api/auth/forgot-password','/api/auth/reset-password'],sharedLimit('recovery',5,900),concurrencyLimit(4));
+const recoveryReady=databaseReady.then(db=>recoveryRoutes(db));
+app.use('/api',route(async(req,res,next)=>(await recoveryReady)(req,res,next)));
+app.use('/api',route(async(req,res,next)=>(await billingReady).router(req,res,next)));
+app.use('/api',route(async(req,res,next)=>(await routesReady).router(req,res,next)));
+const listeningReady = routesReady.then(({db,auth})=>listeningRoutes(db,auth));
+app.use('/api',route(async(req,res,next)=>(await listeningReady)(req,res,next)));
+
+const quotaReady=databaseReady.then(db=>aiQuota(db));
+app.use(['/api/gemini','/api/tts'],route(async(req,res,next)=>(await quotaReady)(req,res,next)));
 
 // Lazy initializer for Gemini API client
 let aiClient: GoogleGenAI | null = null;
 function getAIClient(): GoogleGenAI | null {
+  // Student-facing deployments must use a provider approved for their audience.
+  if (process.env.STUDENT_DIRECT_MODE !== 'false') return null;
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
   if (!aiClient) {
     aiClient = new GoogleGenAI({
       apiKey,
       httpOptions: {
+        timeout: 20_000,
         headers: {
           'User-Agent': 'aistudio-build',
         },
@@ -42,8 +90,8 @@ function getAIClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Resilient model fallback runner (prioritizing gemini-3.6-flash, then gemini-flash-latest, gemini-3.8-flash)
-const FAST_GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.8-flash'];
+// Configurable model fallback with a bounded number of upstream attempts
+const FAST_GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-flash-latest').split(',').map(m => m.trim()).filter(Boolean).slice(0, 2);
 
 async function generateWithModelFallback(
   ai: GoogleGenAI,
@@ -74,103 +122,23 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Cache for generated audio buffers to optimize latency
-const ttsCache = new Map<string, Buffer>();
-
-function fetchTtsChunk(chunkText: string): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const encoded = encodeURIComponent(chunkText);
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ms&client=tw-ob&q=${encoded}`;
-    https.get(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, (resp) => {
-      if (resp.statusCode !== 200) {
-        return reject(new Error(`TTS failed with status: ${resp.statusCode}`));
-      }
-      const data: Buffer[] = [];
-      resp.on('data', (c) => data.push(c));
-      resp.on('end', () => resolve(Buffer.concat(data)));
-      resp.on('error', reject);
-    }).on('error', reject);
-  });
-}
-
-async function getMalayAudioBuffer(fullText: string): Promise<Buffer> {
-  // Clean text from Markdown tags, asterisks, bracket tags
-  const cleaned = fullText
-    .replace(/[*#_~`]/g, '')
-    .replace(/\[JEDA\]/gi, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (ttsCache.has(cleaned)) {
-    return ttsCache.get(cleaned)!;
-  }
-
-  const chunks: string[] = [];
-  if (cleaned.length <= 160) {
-    chunks.push(cleaned);
-  } else {
-    // Split sentences or punctuation
-    const sentences = cleaned.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [cleaned];
-    let current = '';
-    for (const s of sentences) {
-      if ((current + ' ' + s).trim().length <= 160) {
-        current = (current + ' ' + s).trim();
-      } else {
-        if (current) chunks.push(current);
-        if (s.length <= 160) {
-          current = s.trim();
-        } else {
-          // split by words if single sentence is long
-          const words = s.split(' ');
-          current = '';
-          for (const w of words) {
-            if ((current + ' ' + w).trim().length <= 160) {
-              current = (current + ' ' + w).trim();
-            } else {
-              if (current) chunks.push(current);
-              current = w;
-            }
-          }
-        }
-      }
-    }
-    if (current) chunks.push(current);
-  }
-
-  const audioParts: Buffer[] = [];
-  for (const chunk of chunks) {
-    if (chunk.trim()) {
-      const buf = await fetchTtsChunk(chunk.trim());
-      audioParts.push(buf);
-    }
-  }
-
-  const finalBuffer = Buffer.concat(audioParts);
-  if (ttsCache.size > 300) {
-    const firstKey = ttsCache.keys().next().value;
-    if (firstKey) ttsCache.delete(firstKey);
-  }
-  ttsCache.set(cleaned, finalBuffer);
-  return finalBuffer;
-}
-
 // Dedicated authentic Malaysian Malay TTS Audio Endpoint (GET)
 app.get('/api/tts', async (req, res) => {
   try {
-    const text = (req.query.text as string || '').trim();
-    if (!text) {
+    const text = typeof req.query.text === 'string' ? req.query.text.trim() : '';
+    if (!text || text.length > 5000) {
       return res.status(400).send('Parameter teks diperlukan.');
     }
     const audioBuffer = await getMalayAudioBuffer(text);
     res.set({
       'Content-Type': 'audio/mpeg',
       'Content-Length': audioBuffer.length.toString(),
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'private, max-age=86400',
     });
     res.send(audioBuffer);
   } catch (err: any) {
-    console.error('TTS endpoint error:', err);
-    res.status(500).send('Ralat penjanaan audio Bahasa Melayu');
+    console.error('TTS provider unavailable');
+    res.status(503).send('Audio awan tidak tersedia. Cuba suara peranti.');
   }
 });
 
@@ -178,19 +146,19 @@ app.get('/api/tts', async (req, res) => {
 app.post('/api/tts', async (req, res) => {
   try {
     const text = (req.body.text as string || '').trim();
-    if (!text) {
+    if (!text || text.length > 5000) {
       return res.status(400).send('Parameter teks diperlukan.');
     }
     const audioBuffer = await getMalayAudioBuffer(text);
     res.set({
       'Content-Type': 'audio/mpeg',
       'Content-Length': audioBuffer.length.toString(),
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'private, max-age=86400',
     });
     res.send(audioBuffer);
   } catch (err: any) {
-    console.error('TTS endpoint error:', err);
-    res.status(500).send('Ralat penjanaan audio Bahasa Melayu');
+    console.error('TTS provider unavailable');
+    res.status(503).send('Audio awan tidak tersedia. Cuba suara peranti.');
   }
 });
 
@@ -200,22 +168,7 @@ app.post('/api/gemini/chat', async (req, res) => {
     const { messages, tutorStyle = 'cikgu_ramah', topic } = req.body;
     const ai = getAIClient();
 
-    if (!ai) {
-      // Fallback if API key is not yet configured
-      return res.json({
-        reply: "Bagus soalan anda! Sila pastikan kunci API Gemini dimasukkan untuk mendapatkan bimbingan interaktif penuh. Mari kita teruskan latihan bertutur!",
-        grammarAnalysis: {
-          hasErrors: false,
-          corrections: [],
-          elevatedVocabulary: [
-            { original: "baik", suggestion: "unggul / cemerlang", context: "Sebagai peningkatan kosa kata aras tinggi" },
-            { original: "banyak", suggestion: "pelbagai / sarat dengan", context: "Memperkaya variasi bahasa" }
-          ],
-          proverbs: ["Hendak seribu daya, tak hendak seribu dalih"],
-          fluencyTip: "Gunakan intonasi yang tegas dan jeda yang sesuai pada setiap noktah."
-        }
-      });
-    }
+    if (!ai) return res.status(503).json({error:'Cikgu AI belum tersedia.'});
 
     const systemInstruction = `Anda ialah Cikgu Maya / Tutor Pintar Bahasa Melayu SPM untuk Ujian Bertutur KSSM 1103/3.
 Tugas anda:
@@ -292,35 +245,15 @@ app.post('/api/gemini/evaluate-speaking', async (req, res) => {
       stimulusContext
     );
 
+    if (typeof studentResponse !== 'string' || !studentResponse.trim() || studentResponse.length>12000 || typeof stimulusTopic !== 'string') return res.status(400).json({error:'Jawapan diperlukan.'});
+    const db=await databaseReady;
+    const inputHash=digest(JSON.stringify([topicId,stimulusTopic,stimulusContext,studentResponse,assessmentType,questionAsked]));
+    const id='speaking:'+inputHash;
+    const cached=await cachedAttempt(db,res.locals.userId,id);
+    if(cached) return res.json({...cached,awarded:0});
     const ai = getAIClient();
 
-    if (!ai) {
-      return res.json({
-        totalScore: 34,
-        maxScore: 40,
-        band: "Kepujian (29 - 34)",
-        rubricBreakdown: {
-          tatabahasaKosaKata: { score: 8, max: 10, feedback: "Penggunaan kosa kata tepat dengan struktur ayat majmuk yang gramatis." },
-          sebutanIntonasi: { score: 9, max: 10, feedback: "Sebutan baku Bahasa Melayu jelas dan intonasi bersahaja mengikut laras formal." },
-          kefasihanKelancaran: { score: 8, max: 10, feedback: "Pertuturan lancar dan teratur tanpa jeda yang terlalu lama." },
-          pengolahanIdea: { score: 9, max: 10, feedback: "Idea dihuraikan dengan matang dan menepati soalan pentaksir secara khusus." }
-        },
-        strengths: [
-          "Penyampaian idea yang berfokus terus kepada soalan yang ditanya",
-          "Keyakinan bertutur dalam laras bahasa Melayu standard",
-          "Penggunaan penanda wacana yang tersusun"
-        ],
-        improvements: [
-          "Perbanyakkan kosa kata aras tinggi seperti 'maslahat', 'obligasi', 'sinergi'",
-          "Selitkan peribahasa Melayu yang tepat untuk mengukuhkan huraian isi"
-        ],
-        grammarErrors: [
-          { original: "oleh kerana", corrected: "oleh sebab", rule: "Kata sendi nama 'oleh' mesti diikuti kata nama 'sebab'." }
-        ],
-        exemplarAnswer: curatedAnswer,
-        examinerSummary: "Calon menunjukkan penguasaan lisan yang baik dan berupaya mengutarakan hujah yang menepati soalan pentaksir."
-      });
-    }
+    if (!ai) return res.status(503).json({ error: 'Penilaian AI belum tersedia. Sila cuba lagi kemudian.' });
 
     const systemInstruction = `Anda ialah Ketua Pentaksir Kebangsaan bagi Ujian Bertutur Bahasa Melayu KSSM SPM (Kod Kertas: 1103/3).
 Tilai respon lisan murid berdasarkan Kriteria Pemarkahan Lembaga Peperiksaan Malaysia (LPM) 40 Markah penuh:
@@ -389,39 +322,11 @@ Rujukan Skema Asas yang diterima:
     if (!parsed.exemplarAnswer || parsed.exemplarAnswer.length < 60) {
       parsed.exemplarAnswer = curatedAnswer;
     }
-    res.json(parsed);
+    if (!Number.isInteger(parsed.totalScore) || parsed.totalScore<0 || parsed.totalScore>40 || parsed.maxScore!==40 || !parsed.rubricBreakdown) throw new Error('Invalid assessment output');
+    res.json(await recordAttempt(db,res.locals.userId,id,'speaking',topicId||stimulusTopic,inputHash,parsed,50+(parsed.totalScore>=32?25:0)));
   } catch (error: any) {
     console.error('Evaluate speaking error:', error);
-    const fallbackAnswer = getSpeakingModelAnswer(
-      req.body.topicId || req.body.stimulusTopic,
-      req.body.stimulusTopic,
-      req.body.questionAsked,
-      req.body.stimulusContext
-    );
-    res.json({
-      totalScore: 33,
-      maxScore: 40,
-      band: "Kepujian (29 - 34)",
-      rubricBreakdown: {
-        tatabahasaKosaKata: { score: 8, max: 10, feedback: "Penggunaan kosa kata tepat dengan struktur ayat majmuk yang gramatis." },
-        sebutanIntonasi: { score: 8, max: 10, feedback: "Sebutan jelas dan intonasi memuaskan mengikut laras formal." },
-        kefasihanKelancaran: { score: 8, max: 10, feedback: "Pertuturan lancar dan teratur tanpa jeda yang berlebihan." },
-        pengolahanIdea: { score: 9, max: 10, feedback: "Idea dihuraikan dengan contoh relevan dan matang selaras dengan kehendak soalan." }
-      },
-      strengths: [
-        "Penyampaian idea berfokus kepada soalan pentaksir",
-        "Penggunaan penanda wacana yang tersusun"
-      ],
-      improvements: [
-        "Tingkatkan penggunaan kosa kata aras tinggi seperti 'maslahat', 'obligasi', 'sinergi'",
-        "Selitkan peribahasa Melayu yang tepat untuk mengukuhkan huraian"
-      ],
-      grammarErrors: [
-        { original: "oleh kerana", corrected: "oleh sebab", rule: "Kata sendi nama 'oleh' mesti diikuti kata nama 'sebab'." }
-      ],
-      exemplarAnswer: fallbackAnswer,
-      examinerSummary: "Calon menunjukkan penguasaan lisan yang baik dan mampu mengutarakan hujah yang menepati soalan pentaksir."
-    });
+    res.status(503).json({ error: 'Penilaian AI tidak tersedia. Sila cuba lagi.' });
   }
 });
 
@@ -640,794 +545,13 @@ Skema / Jawapan Disasarkan: ${expectedAnswer || 'N/A'}`;
   }
 });
 
-// ============================================================================
-// REAL USER LEADERBOARD (No fake/system peers, starts clean from Day 1)
-// ============================================================================
-// Real-time Leaderboard & Student Account Authentication System
-// ============================================================================
-interface RegisteredUserRecord {
-  id: string; // unique userId
-  email: string; // unique lowercase email
-  username: string; // unique lowercase
-  authProvider?: 'email' | 'google';
-  googleId?: string;
-  passwordHash?: string;
-  salt?: string;
-  studentName: string;
-  schoolName: string;
-  state: string;
-  avatar: string;
-  createdAt: string;
-  points: number;
-  streak: number;
-  level: number;
-  levelName: string;
-  lastCheckInDate: string;
-  claimedStreakDays: number[];
-  totalSpeakingDone: number;
-  totalListeningDone: number;
-  totalExercisesDone: number;
-  lastSpmGrade?: any;
-}
-
-interface RealLeaderboardRecord {
-  id: string; // unique userId
-  name: string;
-  email?: string;
-  username?: string;
-  authProvider?: 'email' | 'google';
-  isRegistered?: boolean;
-  school: string;
-  state: string;
-  points: number;
-  streak: number;
-  predictedGrade: string;
-  avatar: string;
-  updatedAt: string;
-}
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const LEADERBOARD_FILE = path.join(DATA_DIR, 'real_leaderboard.json');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-
-// Memory caches
-let realParticipants: RealLeaderboardRecord[] = [];
-let registeredUsers: RegisteredUserRecord[] = [];
-const activeSessions = new Map<string, string>(); // token -> userId
-
-// Password hashing helper
-function hashPassword(password: string, salt: string): string {
-  return crypto.createHash('sha256').update(`${salt}:${password}`).digest('hex');
-}
-
-function generateSessionToken(userId: string): string {
-  const token = `spm_sess_${userId}_${crypto.randomBytes(16).toString('hex')}`;
-  activeSessions.set(token, userId);
-  return token;
-}
-
-function sanitizeUser(user: RegisteredUserRecord) {
-  return {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    studentName: user.studentName,
-    schoolName: user.schoolName,
-    state: user.state,
-    avatar: user.avatar,
-    createdAt: user.createdAt,
-    authProvider: user.authProvider || 'email',
-    isRegistered: true,
-  };
-}
-
-function extractUserProgress(user: RegisteredUserRecord) {
-  return {
-    userId: user.id,
-    email: user.email,
-    authProvider: user.authProvider || 'email',
-    points: user.points || 0,
-    streak: user.streak || 0,
-    level: user.level || 1,
-    levelName: user.levelName || 'Pemula Bahasa',
-    studentName: user.studentName,
-    schoolName: user.schoolName,
-    state: user.state,
-    avatar: user.avatar,
-    username: user.username,
-    isRegistered: true,
-    lastCheckInDate: user.lastCheckInDate || '',
-    claimedStreakDays: user.claimedStreakDays || [],
-    totalSpeakingDone: user.totalSpeakingDone || 0,
-    totalListeningDone: user.totalListeningDone || 0,
-    totalExercisesDone: user.totalExercisesDone || 0,
-    lastSpmGrade: user.lastSpmGrade,
-  };
-}
-
-// Load registered users from disk
-try {
-  if (fs.existsSync(USERS_FILE)) {
-    const raw = fs.readFileSync(USERS_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      registeredUsers = parsed;
-    }
-  }
-} catch (e) {
-  console.warn('Could not read users.json:', e);
-  registeredUsers = [];
-}
-
-function persistUsers() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(USERS_FILE, JSON.stringify(registeredUsers, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn('Could not persist users.json:', e);
-  }
-}
-
-// Initialize real participants from disk if available
-try {
-  if (fs.existsSync(LEADERBOARD_FILE)) {
-    const raw = fs.readFileSync(LEADERBOARD_FILE, 'utf-8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      realParticipants = parsed;
-    }
-  }
-} catch (e) {
-  console.warn('Could not read real_leaderboard.json:', e);
-  realParticipants = [];
-}
-
-// Ensure all registered users are properly synchronized into realParticipants
-registeredUsers.forEach((user) => {
-  const existingIdx = realParticipants.findIndex((p) => p.id === user.id);
-  const safeName = (user.studentName && !user.studentName.includes('@')) ? user.studentName : 'Calon SPM';
-  const entry: RealLeaderboardRecord = {
-    id: user.id,
-    name: safeName,
-    email: user.email,
-    username: user.username,
-    authProvider: user.authProvider || 'email',
-    isRegistered: true,
-    school: user.schoolName || 'Calon SPM',
-    state: user.state || 'Malaysia',
-    points: user.points || 0,
-    streak: user.streak || 0,
-    predictedGrade: user.lastSpmGrade?.grade || (user.points > 100 ? 'A' : 'A-'),
-    avatar: user.avatar || '⭐',
-    updatedAt: new Date().toISOString(),
-  };
-  if (existingIdx >= 0) {
-    realParticipants[existingIdx] = { ...realParticipants[existingIdx], ...entry };
-  } else {
-    realParticipants.push(entry);
-  }
-});
-
-function persistRealParticipants() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(realParticipants, null, 2), 'utf-8');
-  } catch (e) {
-    console.warn('Could not persist real_leaderboard.json:', e);
-  }
-}
-
-// ----------------------------------------------------------------------------
-// Authentication Endpoints
-// ----------------------------------------------------------------------------
-
-// POST /api/auth/register - Register a new student account using email
-app.post('/api/auth/register', (req, res) => {
-  try {
-    const {
-      email,
-      username,
-      password,
-      studentName,
-      schoolName,
-      state,
-      avatar,
-      initialPoints,
-      initialStreak,
-      initialLastCheckInDate,
-      initialClaimedStreakDays,
-      initialLastSpmGrade,
-      totalSpeakingDone,
-      totalListeningDone,
-    } = req.body;
-
-    // Validate email
-    if (!email || typeof email !== 'string' || !email.includes('@') || email.trim().length < 5) {
-      return res.status(400).json({ error: 'Sila masukkan alamat e-mel yang sah.' });
-    }
-    const cleanEmail = email.trim().toLowerCase();
-
-    // Check if email already registered
-    const existingEmail = registeredUsers.find((u) => u.email?.toLowerCase() === cleanEmail);
-    if (existingEmail) {
-      // If user was registered without a password (e.g. prior Google sign-up before Google was removed),
-      // seamlessly assign their password, update provider to email, and log them in!
-      if (!existingEmail.passwordHash || !existingEmail.salt) {
-        existingEmail.salt = crypto.randomBytes(16).toString('hex');
-        existingEmail.passwordHash = hashPassword(password, existingEmail.salt);
-        existingEmail.authProvider = 'email';
-        if (studentName && (existingEmail.studentName === 'Calon SPM' || existingEmail.studentName.startsWith('calon_'))) {
-          existingEmail.studentName = studentName.trim();
-        }
-        persistUsers();
-
-        // Refresh user in leaderboard
-        const existingLbIdx = realParticipants.findIndex((p) => p.id === existingEmail.id);
-        const lbEntry: RealLeaderboardRecord = {
-          id: existingEmail.id,
-          name: existingEmail.studentName,
-          email: existingEmail.email,
-          username: existingEmail.username,
-          authProvider: 'email',
-          isRegistered: true,
-          school: existingEmail.schoolName || 'Calon SPM',
-          state: existingEmail.state || 'Malaysia',
-          points: existingEmail.points || 0,
-          streak: existingEmail.streak || 1,
-          predictedGrade: existingEmail.lastSpmGrade?.grade || (existingEmail.points > 100 ? 'A' : 'A-'),
-          avatar: existingEmail.avatar || '👨‍🎓',
-          updatedAt: new Date().toISOString(),
-        };
-        if (existingLbIdx >= 0) {
-          realParticipants[existingLbIdx] = lbEntry;
-        } else {
-          realParticipants.push(lbEntry);
-        }
-        persistRealParticipants();
-
-        const token = generateSessionToken(existingEmail.id);
-        return res.json({
-          success: true,
-          token,
-          user: sanitizeUser(existingEmail),
-          progress: extractUserProgress(existingEmail),
-          message: 'Kata laluan berjaya ditetapkan untuk akaun anda!',
-        });
-      }
-
-      return res.status(400).json({ error: 'E-mel ini telah didaftarkan. Sila masukkan kata laluan anda di tab "Log Masuk".' });
-    }
-
-    // Determine or generate unique username (anonymous ID, never using email prefix)
-    const randomCandidateId = `calon_${Math.floor(10000 + Math.random() * 90000)}`;
-    let cleanUsername = (username && !username.includes('@') ? username : randomCandidateId)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, '');
-    if (cleanUsername.length < 3) {
-      cleanUsername = randomCandidateId;
-    }
-
-    // Ensure username uniqueness
-    let finalUsername = cleanUsername;
-    let counter = 1;
-    while (registeredUsers.some((u) => u.username.toLowerCase() === finalUsername.toLowerCase())) {
-      finalUsername = `${cleanUsername}_${counter}`;
-      counter++;
-    }
-
-    if (!password || typeof password !== 'string' || password.length < 4) {
-      return res.status(400).json({ error: 'Kata laluan mestilah sekurang-kurangnya 4 aksara.' });
-    }
-
-    const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = hashPassword(password, salt);
-    const userId = `usr_${crypto.randomUUID()}`;
-
-    const points = typeof initialPoints === 'number' && initialPoints > 0 ? initialPoints : 0;
-    const streak = typeof initialStreak === 'number' && initialStreak > 0 ? initialStreak : 0;
-
-    const safeStudentName = (studentName && !studentName.includes('@') && !studentName.startsWith('calon_'))
-      ? studentName.trim()
-      : 'Calon SPM';
-
-    const newUser: RegisteredUserRecord = {
-      id: userId,
-      email: cleanEmail,
-      username: finalUsername,
-      authProvider: 'email',
-      passwordHash,
-      salt,
-      studentName: safeStudentName,
-      schoolName: (schoolName || 'Calon SPM').trim(),
-      state: (state || 'Kuala Lumpur').trim(),
-      avatar: avatar || '👨‍🎓',
-      createdAt: new Date().toISOString(),
-      points,
-      streak,
-      level: 1,
-      levelName: 'Pemula Bahasa',
-      lastCheckInDate: initialLastCheckInDate || '',
-      claimedStreakDays: Array.isArray(initialClaimedStreakDays) ? initialClaimedStreakDays : [],
-      totalSpeakingDone: typeof totalSpeakingDone === 'number' ? totalSpeakingDone : 0,
-      totalListeningDone: typeof totalListeningDone === 'number' ? totalListeningDone : 0,
-      totalExercisesDone: 0,
-      lastSpmGrade: initialLastSpmGrade || undefined,
-    };
-
-    registeredUsers.push(newUser);
-    persistUsers();
-
-    // Upsert directly into the leaderboard so the registered student appears immediately
-    const leaderboardEntry: RealLeaderboardRecord = {
-      id: newUser.id,
-      name: newUser.studentName,
-      email: newUser.email,
-      username: newUser.username,
-      authProvider: 'email',
-      isRegistered: true,
-      school: newUser.schoolName || 'Calon SPM',
-      state: newUser.state || 'Malaysia',
-      points: newUser.points,
-      streak: newUser.streak,
-      predictedGrade: newUser.lastSpmGrade?.grade || 'A',
-      avatar: newUser.avatar,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const existingLbIdx = realParticipants.findIndex((p) => p.id === newUser.id);
-    if (existingLbIdx >= 0) {
-      realParticipants[existingLbIdx] = leaderboardEntry;
-    } else {
-      realParticipants.push(leaderboardEntry);
-    }
-    persistRealParticipants();
-
-    const token = generateSessionToken(userId);
-
-    return res.json({
-      success: true,
-      token,
-      user: sanitizeUser(newUser),
-      progress: extractUserProgress(newUser),
-      message: 'Pendaftaran akaun calon berjaya!',
-    });
-  } catch (error: any) {
-    console.error('Registration error:', error);
-    return res.status(500).json({ error: 'Gagal mendaftar akaun. Sila cuba lagi.' });
-  }
-});
-
-// POST /api/auth/login - Log in an existing student with email or username
-app.post('/api/auth/login', (req, res) => {
-  try {
-    const { identifier, username, email, password } = req.body;
-    const loginKey = (identifier || email || username || '').trim().toLowerCase();
-
-    if (!loginKey || !password) {
-      return res.status(400).json({ error: 'Sila masukkan e-mel / nama pengguna dan kata laluan.' });
-    }
-
-    const user = registeredUsers.find(
-      (u) =>
-        (u.email && u.email.toLowerCase() === loginKey) ||
-        (u.username && u.username.toLowerCase() === loginKey)
-    );
-
-    if (!user) {
-      return res.status(401).json({ error: 'E-mel atau kata laluan tidak sah.' });
-    }
-
-    // If user account was registered previously without a password (e.g. prior Google sign-up),
-    // seamlessly assign the entered password to their account and convert to email provider!
-    if (!user.passwordHash || !user.salt) {
-      user.salt = crypto.randomBytes(16).toString('hex');
-      user.passwordHash = hashPassword(password, user.salt);
-      user.authProvider = 'email';
-      persistUsers();
-    } else {
-      const testHash = hashPassword(password, user.salt);
-      if (testHash !== user.passwordHash) {
-        return res.status(401).json({ error: 'E-mel atau kata laluan tidak sah.' });
-      }
-    }
-
-    // Refresh user in leaderboard
-    const existingLbIdx = realParticipants.findIndex((p) => p.id === user.id);
-    const lbEntry: RealLeaderboardRecord = {
-      id: user.id,
-      name: user.studentName,
-      email: user.email,
-      username: user.username,
-      authProvider: user.authProvider || 'email',
-      isRegistered: true,
-      school: user.schoolName || 'Calon SPM',
-      state: user.state || 'Malaysia',
-      points: user.points || 0,
-      streak: user.streak || 0,
-      predictedGrade: user.lastSpmGrade?.grade || (user.points > 100 ? 'A' : 'A-'),
-      avatar: user.avatar || '👨‍🎓',
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (existingLbIdx >= 0) {
-      realParticipants[existingLbIdx] = lbEntry;
-    } else {
-      realParticipants.push(lbEntry);
-    }
-    persistRealParticipants();
-
-    const token = generateSessionToken(user.id);
-
-    return res.json({
-      success: true,
-      token,
-      user: sanitizeUser(user),
-      progress: extractUserProgress(user),
-      message: `Selamat kembali, ${user.studentName}!`,
-    });
-  } catch (error: any) {
-    console.error('Login error:', error);
-    return res.status(500).json({ error: 'Gagal log masuk. Sila cuba lagi.' });
-  }
-});
-
-// POST /api/auth/google - Sign up or log in via Google Account
-app.post('/api/auth/google', (req, res) => {
-  try {
-    const {
-      email,
-      name,
-      avatar,
-      googleId,
-      schoolName,
-      state,
-      initialPoints,
-      initialStreak,
-      initialLastCheckInDate,
-      initialClaimedStreakDays,
-      initialLastSpmGrade,
-      totalSpeakingDone,
-      totalListeningDone,
-    } = req.body;
-
-    if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return res.status(400).json({ error: 'E-mel Google tidak sah.' });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-
-    // Check if user already registered with this email
-    let user = registeredUsers.find((u) => u.email?.toLowerCase() === cleanEmail);
-
-    if (user) {
-      // User exists -> Log them in!
-      if (!user.authProvider) user.authProvider = 'google';
-      if (googleId && !user.googleId) user.googleId = googleId;
-      if (name && (!user.studentName || user.studentName.startsWith('calon_'))) {
-        user.studentName = name.trim();
-      }
-      persistUsers();
-
-      // Refresh leaderboard
-      const existingLbIdx = realParticipants.findIndex((p) => p.id === user.id);
-      const lbEntry: RealLeaderboardRecord = {
-        id: user.id,
-        name: user.studentName,
-        email: user.email,
-        username: user.username,
-        authProvider: user.authProvider || 'google',
-        isRegistered: true,
-        school: user.schoolName || 'Calon SPM',
-        state: user.state || 'Malaysia',
-        points: user.points || 0,
-        streak: user.streak || 0,
-        predictedGrade: user.lastSpmGrade?.grade || (user.points > 100 ? 'A' : 'A-'),
-        avatar: user.avatar || '👨‍🎓',
-        updatedAt: new Date().toISOString(),
-      };
-
-      if (existingLbIdx >= 0) {
-        realParticipants[existingLbIdx] = lbEntry;
-      } else {
-        realParticipants.push(lbEntry);
-      }
-      persistRealParticipants();
-
-      const token = generateSessionToken(user.id);
-
-      return res.json({
-        success: true,
-        isNewUser: false,
-        token,
-        user: sanitizeUser(user),
-        progress: extractUserProgress(user),
-        message: `Selamat kembali dengan Google, ${user.studentName}!`,
-      });
-    }
-
-    // New user signing up with Google for the first time
-    let cleanUsername = cleanEmail.split('@')[0].replace(/[^a-z0-9_]/g, '');
-    if (cleanUsername.length < 3) cleanUsername = `calon_${Math.floor(1000 + Math.random() * 9000)}`;
-
-    let finalUsername = cleanUsername;
-    let counter = 1;
-    while (registeredUsers.some((u) => u.username.toLowerCase() === finalUsername.toLowerCase())) {
-      finalUsername = `${cleanUsername}_${counter}`;
-      counter++;
-    }
-
-    const userId = `usr_${crypto.randomUUID()}`;
-    const points = typeof initialPoints === 'number' && initialPoints > 0 ? initialPoints : 0;
-    const streak = typeof initialStreak === 'number' && initialStreak > 0 ? initialStreak : 1;
-
-    const newUser: RegisteredUserRecord = {
-      id: userId,
-      email: cleanEmail,
-      username: finalUsername,
-      authProvider: 'google',
-      googleId: googleId || undefined,
-      studentName: (name || finalUsername).trim(),
-      schoolName: (schoolName || 'Calon SPM').trim(),
-      state: (state || 'Kuala Lumpur').trim(),
-      avatar: avatar || '👩‍🎓',
-      createdAt: new Date().toISOString(),
-      points,
-      streak,
-      level: 1,
-      levelName: 'Pemula Bahasa',
-      lastCheckInDate: initialLastCheckInDate || new Date().toISOString().split('T')[0],
-      claimedStreakDays: Array.isArray(initialClaimedStreakDays) ? initialClaimedStreakDays : [1],
-      totalSpeakingDone: typeof totalSpeakingDone === 'number' ? totalSpeakingDone : 0,
-      totalListeningDone: typeof totalListeningDone === 'number' ? totalListeningDone : 0,
-      totalExercisesDone: 0,
-      lastSpmGrade: initialLastSpmGrade || undefined,
-    };
-
-    registeredUsers.push(newUser);
-    persistUsers();
-
-    const leaderboardEntry: RealLeaderboardRecord = {
-      id: newUser.id,
-      name: newUser.studentName,
-      email: newUser.email,
-      username: newUser.username,
-      authProvider: 'google',
-      isRegistered: true,
-      school: newUser.schoolName,
-      state: newUser.state,
-      points: newUser.points,
-      streak: newUser.streak,
-      predictedGrade: newUser.lastSpmGrade?.grade || 'A',
-      avatar: newUser.avatar,
-      updatedAt: new Date().toISOString(),
-    };
-
-    realParticipants.push(leaderboardEntry);
-    persistRealParticipants();
-
-    const token = generateSessionToken(userId);
-
-    return res.json({
-      success: true,
-      isNewUser: true,
-      token,
-      user: sanitizeUser(newUser),
-      progress: extractUserProgress(newUser),
-      message: `Pendaftaran akaun Google berjaya! Selamat datang, ${newUser.studentName}.`,
-    });
-  } catch (error: any) {
-    console.error('Google auth error:', error);
-    return res.status(500).json({ error: 'Gagal memproses akaun Google. Sila cuba lagi.' });
-  }
-});
-
-// GET /api/auth/me - Verify session or fetch current user profile
-app.get('/api/auth/me', (req, res) => {
-  const authHeader = req.headers.authorization;
-  const token = (authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : (req.query.token as string)) || '';
-  const userId = activeSessions.get(token) || (req.query.userId as string);
-
-  if (!userId) {
-    return res.status(401).json({ error: 'Tidak sah atau sesi telah tamat.' });
-  }
-
-  const user = registeredUsers.find((u) => u.id === userId);
-  if (!user) {
-    return res.status(404).json({ error: 'Akaun tidak dijumpai.' });
-  }
-
-  return res.json({
-    success: true,
-    user: sanitizeUser(user),
-    progress: extractUserProgress(user),
-  });
-});
-
-// POST /api/auth/update-profile - Update student profile info
-app.post('/api/auth/update-profile', (req, res) => {
-  const { userId, studentName, schoolName, state, avatar } = req.body;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const userIdx = registeredUsers.findIndex((u) => u.id === userId);
-  if (userIdx < 0) {
-    return res.status(404).json({ error: 'Akaun tidak dijumpai.' });
-  }
-
-  const user = registeredUsers[userIdx];
-  if (studentName) user.studentName = studentName.trim();
-  if (schoolName !== undefined) user.schoolName = schoolName.trim();
-  if (state) user.state = state.trim();
-  if (avatar) user.avatar = avatar.trim();
-
-  registeredUsers[userIdx] = user;
-  persistUsers();
-
-  // Sync to leaderboard
-  const lbIdx = realParticipants.findIndex((p) => p.id === userId);
-  if (lbIdx >= 0) {
-    realParticipants[lbIdx].name = user.studentName;
-    realParticipants[lbIdx].school = user.schoolName;
-    realParticipants[lbIdx].state = user.state;
-    realParticipants[lbIdx].avatar = user.avatar;
-    realParticipants[lbIdx].updatedAt = new Date().toISOString();
-    persistRealParticipants();
-  }
-
-  return res.json({
-    success: true,
-    user: sanitizeUser(user),
-    progress: extractUserProgress(user),
-  });
-});
-
-// POST /api/auth/sync-progress - Sync student XP, streak, and grade into registered account
-app.post('/api/auth/sync-progress', (req, res) => {
-  const { userId, points, streak, lastCheckInDate, claimedStreakDays, level, levelName, lastSpmGrade, totalSpeakingDone, totalListeningDone } = req.body;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const userIdx = registeredUsers.findIndex((u) => u.id === userId);
-  if (userIdx >= 0) {
-    const user = registeredUsers[userIdx];
-    if (typeof points === 'number') user.points = points;
-    if (typeof streak === 'number') user.streak = streak;
-    if (lastCheckInDate) user.lastCheckInDate = lastCheckInDate;
-    if (Array.isArray(claimedStreakDays)) user.claimedStreakDays = claimedStreakDays;
-    if (typeof level === 'number') user.level = level;
-    if (levelName) user.levelName = levelName;
-    if (lastSpmGrade) user.lastSpmGrade = lastSpmGrade;
-    if (typeof totalSpeakingDone === 'number') user.totalSpeakingDone = totalSpeakingDone;
-    if (typeof totalListeningDone === 'number') user.totalListeningDone = totalListeningDone;
-
-    registeredUsers[userIdx] = user;
-    persistUsers();
-
-    // Sync to leaderboard
-    const lbIdx = realParticipants.findIndex((p) => p.id === userId);
-    if (lbIdx >= 0) {
-      realParticipants[lbIdx].points = user.points;
-      realParticipants[lbIdx].streak = user.streak;
-      if (user.lastSpmGrade?.grade) {
-        realParticipants[lbIdx].predictedGrade = user.lastSpmGrade.grade;
-      }
-      realParticipants[lbIdx].updatedAt = new Date().toISOString();
-      persistRealParticipants();
-    }
-    return res.json({ success: true, progress: extractUserProgress(user) });
-  }
-
-  return res.status(404).json({ error: 'Pengguna berdaftar tidak dijumpai' });
-});
-
-// ----------------------------------------------------------------------------
-// Leaderboard Endpoints
-// ----------------------------------------------------------------------------
-
-// GET /api/leaderboard - fetch real registered participants sorted by points (only registered candidates)
-app.get('/api/leaderboard', (req, res) => {
-  // The leaderboard exclusively contains registered candidates
-  const list = realParticipants.filter((p) => p.isRegistered);
-
-  const sorted = list.sort((a, b) => (b.points || 0) - (a.points || 0));
-  const ranked = sorted.map((p, idx) => {
-    const rank = idx + 1;
-    let league: 'diamond' | 'gold' | 'silver' | 'bronze' = 'bronze';
-    if (rank <= 3) league = 'diamond';
-    else if (rank <= 8) league = 'gold';
-    else if (rank <= 14) league = 'silver';
-    else league = 'bronze';
-
-    // Strictly omit email and username to protect student privacy
-    const displayName = (p.name && !p.name.includes('@') && !p.name.startsWith('calon_'))
-      ? p.name
-      : 'Calon SPM';
-    return {
-      id: p.id,
-      rank,
-      name: displayName,
-      username: '',
-      isRegistered: true,
-      school: p.school || 'Calon SPM',
-      state: p.state || 'Malaysia',
-      points: p.points || 0,
-      streak: p.streak || 0,
-      predictedGrade: p.predictedGrade || 'A',
-      avatar: p.avatar || '⭐',
-      league,
-      isCurrentUser: false,
-      trend: 'same' as const,
-    };
-  });
-
-  res.json({
-    entries: ranked,
-    totalRealUsers: ranked.length,
-    registeredCount: ranked.length,
-  });
-});
-
-// POST /api/leaderboard/sync - upsert real user stats (guests or registered)
-app.post('/api/leaderboard/sync', (req, res) => {
-  const { userId, name, school, state, points, streak, predictedGrade, avatar, username, isRegistered } = req.body;
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
-
-  const existingUser = registeredUsers.find((u) => u.id === userId);
-  const isReg = Boolean(isRegistered || existingUser);
-
-  const existingIdx = realParticipants.findIndex((p) => p.id === userId);
-  const record: RealLeaderboardRecord = {
-    id: userId,
-    name: (name || (existingUser ? existingUser.studentName : 'Calon SPM')).trim(),
-    username: existingUser ? existingUser.username : username || '',
-    isRegistered: isReg,
-    school: (school || (existingUser ? existingUser.schoolName : '')).trim(),
-    state: (state || (existingUser ? existingUser.state : 'Malaysia')).trim(),
-    points: typeof points === 'number' ? points : 0,
-    streak: typeof streak === 'number' ? streak : 0,
-    predictedGrade: predictedGrade || 'A',
-    avatar: avatar || (existingUser ? existingUser.avatar : '⭐'),
-    updatedAt: new Date().toISOString(),
-  };
-
-  if (existingIdx >= 0) {
-    realParticipants[existingIdx] = record;
-  } else {
-    realParticipants.push(record);
-  }
-
-  persistRealParticipants();
-  res.json({ success: true, count: realParticipants.length });
-});
-
-// POST /api/leaderboard/reset - wipe leaderboard memory to start clean from Day 1
-app.post('/api/leaderboard/reset', (req, res) => {
-  realParticipants = [];
-  persistRealParticipants();
-  res.json({ success: true, message: 'Papan pendahulu telah dikosongkan (Bermula Hari 1)' });
-});
-
-// POST /api/admin/clear-all - wipe all registered accounts, sessions, and leaderboard to start clean from Day 1
-app.post('/api/admin/clear-all', (req, res) => {
-  registeredUsers = [];
-  realParticipants = [];
-  activeSessions.clear();
-  persistUsers();
-  persistRealParticipants();
-  res.json({ success: true, message: 'Semua akaun dan memori telah dikosongkan. Bermula dari Hari 1.' });
-});
-
 // Vite Middleware for development & static serving for production
 async function startServer() {
+  const db=await databaseReady;
+  const cleanup=setInterval(()=>{void db.query('DELETE FROM rate_buckets WHERE expires_at < now()').catch(()=>console.error('Quota cleanup failed'));void db.query('DELETE FROM sessions WHERE expires_at < now()').catch(()=>{});void db.query('DELETE FROM reset_tokens WHERE expires_at < now()').catch(()=>{});},60_000);
+  cleanup.unref();
+  app.use('/api', (_req,res)=>res.status(404).json({error:'Endpoint tidak dijumpai.'}));
+  app.use(((error:any,_req:any,res:any,_next:any)=>res.status(error.status || 500).json({error:error.status && error.status < 500 ? error.message : 'Ralat pelayan. Sila cuba lagi.'})) as express.ErrorRequestHandler);
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -1442,9 +566,11 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const listener=app.listen(PORT, process.env.HOST || '127.0.0.1', () => {
     console.log(`SPM BM Prep Server running on port ${PORT}`);
   });
+  const stop=()=>{clearInterval(cleanup);listener.close(()=>{void db.close().then(()=>process.exit(0));});setTimeout(()=>process.exit(1),10000).unref();};
+  process.once('SIGINT',stop);process.once('SIGTERM',stop);
 }
 
-startServer();
+startServer().catch(error => { console.error('Server startup failed:',error.message); process.exitCode=1; });

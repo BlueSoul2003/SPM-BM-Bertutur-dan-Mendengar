@@ -1,3 +1,4 @@
+import { apiFetch } from './api';
 import { AuthUser, UserProgress } from '../types';
 
 const AUTH_USER_KEY = 'spm_bm_auth_user_day1';
@@ -40,6 +41,7 @@ export function clearAuthSession(): void {
 }
 
 export function logout(): void {
+  void apiFetch('/api/auth/logout', { method: 'POST' }, 10_000).catch(() => {});
   clearAuthSession();
 }
 
@@ -84,7 +86,7 @@ export async function registerAccount(payload: RegisterPayload): Promise<{
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/auth/register', {
+    const res = await apiFetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -118,7 +120,7 @@ export async function loginAccount(identifier: string, password: string): Promis
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/auth/login', {
+    const res = await apiFetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password }),
@@ -153,7 +155,7 @@ export async function authenticateWithGoogle(payload: GoogleAuthPayload): Promis
   error?: string;
 }> {
   try {
-    const res = await fetch('/api/auth/google', {
+    const res = await apiFetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -186,13 +188,13 @@ export async function fetchCurrentSession(): Promise<{
 }> {
   const token = getStoredAuthToken();
   const cachedUser = getStoredAuthUser();
-  if (!token && !cachedUser) return { user: null, progress: null };
+  if (!token) return { user: null, progress: null };
 
   try {
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`/api/auth/me${token ? '' : `?userId=${cachedUser?.id}`}`, { headers });
+    const res = await apiFetch('/api/auth/me', { headers });
     if (!res.ok) {
       if (res.status === 401) {
         clearAuthSession();
@@ -209,7 +211,7 @@ export async function fetchCurrentSession(): Promise<{
     console.warn('Failed to verify session with server:', e);
   }
 
-  return { user: cachedUser, progress: null };
+  return { user: null, progress: null };
 }
 
 export async function updateProfile(payload: {
@@ -220,7 +222,7 @@ export async function updateProfile(payload: {
   avatar?: string;
 }): Promise<{ success: boolean; user?: AuthUser; progress?: UserProgress; error?: string }> {
   try {
-    const res = await fetch('/api/auth/update-profile', {
+    const res = await apiFetch('/api/auth/update-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

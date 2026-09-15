@@ -31,93 +31,8 @@ interface ListeningAssessmentProps {
   onEarnPoints?: (points: number, reason: string, spmGrade?: SpmGradeInfo) => void;
 }
 
-/**
- * Robust Answer Comparator for SPM Listening Assessment.
- * Normalizes numeric formats (e.g., 15000 vs 15,000, RM15,000), whitespace, casing, and accepted variations.
- */
-export function isListeningAnswerCorrect(
-  userVal: any,
-  question: { type: string; correctAnswer: any }
-): boolean {
-  if (userVal === undefined || userVal === null) return false;
-
-  if (question.type === 'true_false') {
-    return userVal === question.correctAnswer;
-  }
-
-  if (question.type === 'mcq') {
-    return (
-      String(userVal).trim().toLowerCase() ===
-      String(question.correctAnswer).trim().toLowerCase()
-    );
-  }
-
-  const rawUser = String(userVal).trim();
-  const rawCorrect = String(question.correctAnswer).trim();
-
-  if (!rawUser) return false;
-
-  // Direct case-insensitive match
-  if (rawUser.toLowerCase() === rawCorrect.toLowerCase()) return true;
-
-  // Normalizer: strips currency prefixes, commas, fullstops, and whitespace
-  const normalize = (val: string) => {
-    return val
-      .toLowerCase()
-      .replace(/rm\s*/gi, '')
-      .replace(/ringgit\s*(malaysia)?/gi, '')
-      .replace(/,/g, '') // removes thousands separator: "15,000" -> "15000"
-      .replace(/\./g, '')
-      .replace(/\s+/g, '') // removes internal spaces: "15 000" -> "15000"
-      .replace(/\b(orang|murid|pelajar|sen|sekolah|unit|buah|kali)\b/gi, '');
-  };
-
-  const normUser = normalize(rawUser);
-  const normCorrect = normalize(rawCorrect);
-
-  if (normUser && normCorrect && normUser === normCorrect) {
-    return true;
-  }
-
-  // Check alternative formats in answer (e.g., "15,000 / 15000" or "Dewan Bestari / Bestari")
-  const correctAlternatives = rawCorrect
-    .split(/[/;,|]|\batau\b/i)
-    .map(normalize)
-    .filter(Boolean);
-  if (correctAlternatives.some((alt) => alt === normUser)) {
-    return true;
-  }
-
-  // Number digit extraction check
-  const extractDigits = (s: string) => s.replace(/\D/g, '');
-  const userDigits = extractDigits(rawUser);
-  const correctDigits = extractDigits(rawCorrect);
-  if (userDigits && correctDigits && userDigits === correctDigits) {
-    return true;
-  }
-
-  // Common SPM number word equivalents
-  const numberWordEquivalents: Record<string, string[]> = {
-    '15000': ['lima belas ribu', 'limabelas ribu', '15k', '15 ribu', '15,000', '15000'],
-    '1234': ['1234', 'satu dua tiga empat'],
-    '25000': ['dua puluh lima ribu', '25k', '25 ribu', '25,000', '25000'],
-    '10000': ['sepuluh ribu', '10k', '10 ribu', '10,000', '10000'],
-    '5000': ['lima ribu', '5k', '5 ribu', '5,000', '5000'],
-    '50000': ['lima puluh ribu', '50k', '50 ribu', '50,000', '50000'],
-    '100000': ['seratus ribu', '100k', '100 ribu', '100,000', '100000']
-  };
-
-  for (const [key, variants] of Object.entries(numberWordEquivalents)) {
-    const userMatches = variants.some((v) => normalize(v) === normUser) || userDigits === key;
-    const correctMatches = variants.some((v) => normalize(v) === normCorrect) || correctDigits === key;
-    if (userMatches && correctMatches) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
+import { isListeningAnswerCorrect } from '../utils/listeningGrading';
+import { apiFetch } from '../services/api';
 export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   onWordClick,
   onEarnPoints,
@@ -128,6 +43,10 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   const [selectedTrack, setSelectedTrack] = useState<ListeningTrack>(SPM_LISTENING_TRACKS[0]);
   const [userAnswers, setUserAnswers] = useState<Record<string, any>>({});
   const [isGraded, setIsGraded] = useState(false);
+  const [attemptId,setAttemptId]=useState(()=>crypto.randomUUID());
+  const [submitting,setSubmitting]=useState(false);
+  const [submissionError,setSubmissionError]=useState('');
+  const [serverScore,setServerScore]=useState<number|null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [speed, setSpeed] = useState<number>(1.0);
@@ -163,9 +82,13 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   });
 
   const handleStartSet = (track: ListeningTrack) => {
+    if (submitting) return;
     stopSpeaking();
     setSelectedTrack(track);
     setUserAnswers({});
+    setAttemptId(crypto.randomUUID());
+    setServerScore(null);
+    setSubmissionError('');
     setIsGraded(false);
     setShowTranscript(false);
     setListeningRound(1);
@@ -176,6 +99,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   };
 
   const handleBackToSetList = () => {
+    if (submitting) return;
     stopSpeaking();
     setIsPlaying(false);
     setCurrentPage('set_selection');
@@ -210,35 +134,30 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   };
 
   const handleSelectAnswer = (qId: string, value: any) => {
-    if (isGraded) return;
+    if (isGraded || submitting) return;
     setUserAnswers((prev) => ({ ...prev, [qId]: value }));
   };
 
-  const handleGradeSubmission = () => {
-    handleStopAudio();
-    setIsGraded(true);
-
-    let cCount = 0;
-    selectedTrack.questions.forEach((q) => {
-      const userVal = userAnswers[q.id];
-      if (isListeningAnswerCorrect(userVal, q)) {
-        cCount++;
-      }
-    });
-
-    const totalQuestions = selectedTrack.questions.length;
-    const scaledScore = Math.round((cCount / Math.max(1, totalQuestions)) * 30);
-    const gradeInfo = calculateSpmGrade(scaledScore, 30);
-
-    if (onEarnPoints) {
-      const points = 15 + cCount * 10;
-      onEarnPoints(points, `Ujian Mendengar SPM (${cCount}/${totalQuestions} Betul)`, gradeInfo);
-    }
+  const handleGradeSubmission = async () => {
+    if(submitting || isGraded) return;
+    handleStopAudio();setSubmitting(true);setSubmissionError('');
+    try {
+      const response=await apiFetch('/api/attempts/listening',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({attemptId,trackId:selectedTrack.id,answers:userAnswers})});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Gagal menyimpan jawapan.');
+      setServerScore(result.correctCount);setIsGraded(true);
+      onEarnPoints?.(result.awarded,'Latihan mendengar disimpan',calculateSpmGrade(result.totalScore,result.maxScore));
+    } catch(error) { setSubmissionError(error instanceof Error?error.message:'Sila cuba lagi.'); }
+    finally {setSubmitting(false);}
   };
 
   const handleResetCurrentSet = () => {
+    if (submitting) return;
     handleStopAudio();
     setUserAnswers({});
+    setAttemptId(crypto.randomUUID());
+    setServerScore(null);
+    setSubmissionError('');
     setIsGraded(false);
     setShowTranscript(false);
     setListeningRound(1);
@@ -254,6 +173,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
     }
   });
 
+  if(serverScore!==null)correctCount=serverScore;
   const totalQuestions = selectedTrack.questions.length;
   const percentage = Math.round((correctCount / Math.max(1, totalQuestions)) * 100);
   const scaledSpmScore = Math.round((correctCount / Math.max(1, totalQuestions)) * 30);
@@ -719,11 +639,12 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
             {/* Submission / Grade Action */}
             {!isGraded ? (
               <div className="pt-2">
+                {submissionError && <p role="alert" className="text-rose-700 mb-3">{submissionError}</p>}
                 <button
                   id="submit-listening-answers-btn"
                   type="button"
                   onClick={handleGradeSubmission}
-                  disabled={Object.keys(userAnswers).length === 0}
+                  disabled={submitting || Object.keys(userAnswers).length === 0}
                   className={`w-full py-3.5 px-5 rounded-2xl font-extrabold text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-[0.98] ${
                     Object.keys(userAnswers).length === 0
                       ? 'bg-slate-200 text-slate-400 cursor-not-allowed'

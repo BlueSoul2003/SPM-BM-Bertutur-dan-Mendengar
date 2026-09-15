@@ -1,3 +1,4 @@
+import { Welcome } from './Welcome';
 import React, { useState } from 'react';
 import {
   CheckCircle2,
@@ -17,6 +18,7 @@ import {
 } from '../services/authService';
 
 interface AuthGateViewProps {
+  onRecover:()=>void;
   currentUserProgress: UserProgress;
   onAuthSuccess: (user: AuthUser, progress?: UserProgress) => void;
 }
@@ -24,6 +26,7 @@ interface AuthGateViewProps {
 export const AuthGateView: React.FC<AuthGateViewProps> = ({
   currentUserProgress,
   onAuthSuccess,
+  onRecover,
 }) => {
   const [mode, setMode] = useState<'register' | 'login'>('register');
   const [loading, setLoading] = useState(false);
@@ -51,8 +54,8 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
       return;
     }
 
-    if (!password || password.length < 4) {
-      setErrorMessage('Sila masukkan kata laluan sekurang-kurangnya 4 aksara.');
+    if (!password || password.length < (mode === 'register' ? 8 : 4)) {
+      setErrorMessage('Sila masukkan kata laluan sekurang-kurangnya 8 aksara untuk akaun baharu.');
       return;
     }
 
@@ -105,17 +108,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
   };
 
   return (
-    <div id="auth-gate-portal" className="w-full max-w-md mx-auto py-8 sm:py-16 px-4 animate-in fade-in duration-200">
-      {/* Centered App Logo / Header */}
-      <div className="text-center mb-6">
-        <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 flex items-center justify-center text-white shadow-md border border-emerald-500/30 mb-3">
-          <BookOpenCheck className="w-7 h-7 text-amber-300" />
-        </div>
-        <h1 className="text-2xl font-black font-serif text-slate-900 tracking-tight">
-          SPM Bahasa Melayu
-        </h1>
-      </div>
-
+    <Welcome><div id="auth-gate-portal" className="w-full max-w-md mx-auto py-8 sm:py-16 px-4 animate-in fade-in duration-200">
       {/* Clean Auth Card */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
         {/* Toggle Tabs: Daftar Akaun / Log Masuk */}
@@ -168,13 +161,14 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
           {/* Form */}
           <form onSubmit={handleFormSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
+              <label htmlFor="gate-email-input" className="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
                 <Mail className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Alamat E-mel</span>
               </label>
               <input
                 id="gate-email-input"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -184,7 +178,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label className="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
+              <label htmlFor="gate-password-input" className="font-bold text-slate-700 flex items-center gap-1.5 text-xs">
                 <Lock className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Kata Laluan</span>
               </label>
@@ -194,7 +188,9 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={4}
+                minLength={mode === 'register' ? 8 : 4}
+                maxLength={256}
+                autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 placeholder="Masukkan kata laluan"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none"
               />
@@ -229,6 +225,7 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
             </div>
           </form>
 
+          <button type="button" className="text-sm underline text-[#913b54]" onClick={onRecover}>Lupa kata laluan?</button>
           {/* Toggle mode link */}
           <div className="text-center pt-2 border-t border-slate-100">
             <button
@@ -243,6 +240,6 @@ export const AuthGateView: React.FC<AuthGateViewProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div></Welcome>
   );
 };

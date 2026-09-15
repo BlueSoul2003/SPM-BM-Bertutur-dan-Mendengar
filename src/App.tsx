@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { RecoveryView } from './components/RecoveryView';
+import { SubscriptionStatus } from './components/SubscriptionStatus';
+import { LearningGreeting } from './components/LearningGreeting';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import {
   ActiveTab,
   TargetLanguage,
@@ -9,10 +12,10 @@ import {
   AuthUser
 } from './types';
 import { Navbar } from './components/Navbar';
-import { SpeakingAssessment } from './components/SpeakingAssessment';
-import { ListeningAssessment } from './components/ListeningAssessment';
-import { AiTutorChat } from './components/AiTutorChat';
-import { WeeklyLeaderboard } from './components/WeeklyLeaderboard';
+const SpeakingAssessment = lazy(() => import('./components/SpeakingAssessment').then(m => ({ default: m.SpeakingAssessment })));
+const ListeningAssessment = lazy(() => import('./components/ListeningAssessment').then(m => ({ default: m.ListeningAssessment })));
+const AiTutorChat = lazy(() => import('./components/AiTutorChat').then(m => ({ default: m.AiTutorChat })));
+const WeeklyLeaderboard = lazy(() => import('./components/WeeklyLeaderboard').then(m => ({ default: m.WeeklyLeaderboard })));
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { DictionaryModal } from './components/DictionaryModal';
 import { WordBankModal } from './components/WordBankModal';
@@ -23,6 +26,7 @@ import { AuthGateView } from './components/AuthGateView';
 import { fetchCurrentSession, logout } from './services/authService';
 import {
   loadUserProgress,
+  getInitialProgress,
   saveUserProgress,
   addPointsToUser,
   checkDailyCheckInStatus,
@@ -34,10 +38,13 @@ const WORD_BANK_STORAGE_KEY = 'spm_bm_word_bank_v1';
 const PREF_LANG_STORAGE_KEY = 'spm_bm_pref_lang_v1';
 
 export default function App() {
+  const [resetToken,setResetToken]=useState(()=>new URLSearchParams(window.location.search).get('reset')||'');
+  const [isRecovering,setIsRecovering]=useState(false);
+  useEffect(()=>{if(resetToken)window.history.replaceState({},'',window.location.pathname);},[resetToken]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('speaking');
   const [preferredLang, setPreferredLang] = useState<TargetLanguage>('en');
   const [wordBank, setWordBank] = useState<WordBankItem[]>([]);
-  const [userProgress, setUserProgress] = useState<UserProgress>(loadUserProgress);
+  const [userProgress, setUserProgress] = useState<UserProgress>(() => ({ ...loadUserProgress(), isRegistered: false }));
 
   // Modals state
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
@@ -65,7 +72,8 @@ export default function App() {
           const p = session.progress;
           setUserProgress((prev) => {
             const merged: UserProgress = {
-              ...prev,
+              ...getInitialProgress(),
+              ...p,
               userId: u.id,
               username: u.username,
               studentName: u.studentName,
@@ -75,8 +83,8 @@ export default function App() {
               email: u.email,
               authProvider: u.authProvider,
               isRegistered: true,
-              points: Math.max(prev.points, p?.points || 0),
-              streak: Math.max(prev.streak, p?.streak || 1),
+              points: p?.points || 0,
+              streak: p?.streak || 0,
             };
             saveUserProgress(merged);
             return merged;
@@ -142,7 +150,7 @@ export default function App() {
 
       // Check if eligible for daily check-in
       const checkInStatus = checkDailyCheckInStatus(userProgress.lastCheckInDate);
-      if (checkInStatus.canCheckInToday) {
+      if (userProgress.isRegistered && checkInStatus.canCheckInToday) {
         // Slight delay for smooth initial entrance
         const timer = setTimeout(() => {
           setIsDailyCheckInOpen(true);
@@ -222,22 +230,14 @@ export default function App() {
   };
 
   // Gamification: Earn points callback
-  const handleEarnPoints = (points: number, reason: string, spmGrade?: SpmGradeInfo) => {
-    setUserProgress((prev) => {
-      const updated = addPointsToUser(prev, points, reason, spmGrade);
-      return updated;
-    });
-
-    setPointsToast({
-      points,
-      reason,
-      spmGrade
-    });
-
-    // Auto-dismiss after 4.5 seconds
-    setTimeout(() => {
-      setPointsToast((current) => (current?.reason === reason ? null : current));
-    }, 4500);
+  const handleEarnPoints = async (_points: number, reason: string, spmGrade?: SpmGradeInfo) => {
+    const session=await fetchCurrentSession();
+    if(!session.progress)return;
+    const gained=Math.max(0,session.progress.points-userProgress.points);
+    if(gained>0)setPointsToast({points:gained,reason,spmGrade});
+    saveUserProgress(session.progress);
+    setUserProgress(session.progress);
+    setTimeout(()=>setPointsToast(null),4500);
   };
 
   const handleCheckInSuccess = (rewardXp: number, newStreak: number) => {
@@ -259,7 +259,8 @@ export default function App() {
 
   const handleAuthSuccess = (user: AuthUser, syncedProgress?: UserProgress) => {
     const updated: UserProgress = {
-      ...(syncedProgress || userProgress),
+      ...getInitialProgress(),
+      ...syncedProgress,
       userId: user.id,
       username: user.username,
       studentName: user.studentName,
@@ -269,26 +270,20 @@ export default function App() {
       email: user.email,
       authProvider: user.authProvider,
       isRegistered: true,
-      points: Math.max(userProgress.points, syncedProgress?.points || 0),
-      streak: Math.max(userProgress.streak, syncedProgress?.streak || 1),
+      points: syncedProgress?.points || 0,
+      streak: syncedProgress?.streak || 0,
     };
     setUserProgress(updated);
     saveUserProgress(updated);
     setIsAuthModalOpen(false);
-    setPointsToast({
-      points: updated.points,
-      reason: `Selamat datang, ${user.studentName}! Akaun anda telah disahkan dan kemajuan telah dikunci di Papan Pendahulu.`
-    });
-    setTimeout(() => {
-      setPointsToast(null);
-    }, 5000);
+    setPointsToast(null);
   };
 
   const handleLogout = async () => {
     await logout();
     setUserProgress((prev) => {
       const guest: UserProgress = {
-        ...prev,
+        ...getInitialProgress(),
         userId: `guest_${Date.now()}`,
         username: undefined,
         email: undefined,
@@ -312,8 +307,10 @@ export default function App() {
   const leaderboardData = getWeeklyLeaderboard(userProgress);
   const currentRank = leaderboardData.currentUserRank;
 
+  if(resetToken||isRecovering)return <RecoveryView token={resetToken||undefined} onBack={()=>{setResetToken('');setIsRecovering(false);}}/>;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-amber-100 selection:text-amber-900">
+    <div className="bm-app min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-amber-100 selection:text-amber-900">
       {/* Top Navbar (Only shown after login/registration) */}
       {userProgress.isRegistered && (
         <Navbar
@@ -364,14 +361,17 @@ export default function App() {
       )}
 
       {/* Main Content View (Mandatory registration gate enforced) */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 sm:pb-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 lg:pb-8">
         {!userProgress.isRegistered ? (
           <AuthGateView
+            onRecover={()=>setIsRecovering(true)}
             currentUserProgress={userProgress}
             onAuthSuccess={handleAuthSuccess}
           />
         ) : (
-          <>
+          <Suspense fallback={<div className="loading-card" role="status">Menyediakan ruang belajar...</div>}>
+            <SubscriptionStatus/>
+            <LearningGreeting activeTab={activeTab}/>
             {activeTab === 'speaking' && (
               <SpeakingAssessment
                 onWordClick={handleWordClick}
@@ -405,7 +405,7 @@ export default function App() {
                 onLogout={handleLogout}
               />
             )}
-          </>
+          </Suspense>
         )}
       </main>
 

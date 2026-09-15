@@ -71,34 +71,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { canClaimToday } = checkDailyCheckInStatus(userProgress);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
+    <header className="bm-navbar sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
       <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
-          {/* Logo & Title */}
-          <div
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer select-none"
-            onClick={() => onTabChange('speaking')}
-          >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600 via-teal-700 to-slate-900 flex items-center justify-center text-white shadow-sm border border-emerald-500/30 shrink-0">
-              <BookOpenCheck className="w-5 h-5 text-amber-300" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm sm:text-lg font-extrabold font-serif tracking-tight text-slate-900">
-                  SPM Bahasa Melayu
-                </span>
-                <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300/60 hidden sm:inline-block">
-                  1103/3 & 1103/4
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 hidden md:block">
-                Ujian Bertutur (1103/3) &bull; Ujian Mendengar (1103/4) &bull; AI Tutor BM &bull; Format Rasmi LPM
-              </p>
-            </div>
-          </div>
+        <div className="app-nav-layout">
+          <button type="button" className="wordmark app-wordmark" onClick={() => onTabChange('speaking')} aria-label="Bual, kembali ke latihan bertutur">bual<span>.</span><small>SPM Bahasa Melayu</small></button>
 
             {/* Center Desktop Navigation Tabs */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+          <nav className="app-desktop-tabs hidden lg:flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
             <button
               id="nav-speaking-tab"
               type="button"
@@ -185,7 +164,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Right Action Controls: Gamification badges & tools */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="app-tools">
             {/* Streak Counter */}
             <div
               className="flex items-center gap-1 px-2 py-1 rounded-xl bg-orange-50 border border-orange-200/80 text-orange-800 text-xs font-bold"
@@ -210,6 +189,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Daily Check-In CTA */}
             <button
               id="navbar-daily-checkin-btn"
+              aria-label="Daftar masuk harian"
               onClick={onOpenDailyCheckIn}
               className={`relative px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 ${
                 canClaimToday
@@ -246,6 +226,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Word Bank Button */}
             <button
               id="header-wordbank-btn"
+              aria-label="Buka kosa kata"
               type="button"
               onClick={onOpenWordBank}
               className="relative p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs flex items-center gap-1 transition-colors cursor-pointer"

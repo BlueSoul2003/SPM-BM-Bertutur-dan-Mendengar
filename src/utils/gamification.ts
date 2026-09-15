@@ -1,3 +1,4 @@
+import { apiFetch } from '../services/api';
 import { UserProgress, LeaderboardEntry, SpmGradeInfo } from '../types';
 
 const PROGRESS_STORAGE_KEY = 'spm_bm_user_progress_day1_fresh';
@@ -132,53 +133,15 @@ export function resetUserProgressToDay1(): UserProgress {
 
 // Sync user profile and XP to server real leaderboard
 export async function syncUserToServer(progress: UserProgress): Promise<void> {
-  if (typeof window === 'undefined') return;
-  try {
-    await fetch('/api/leaderboard/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: progress.userId,
-        name: progress.studentName || 'Saya (Calon SPM)',
-        username: progress.username || '',
-        isRegistered: Boolean(progress.isRegistered),
-        school: progress.schoolName || '',
-        state: progress.state || 'Malaysia',
-        points: progress.points || 0,
-        streak: progress.streak || 0,
-        predictedGrade: progress.lastSpmGrade?.grade || (progress.points > 100 ? 'A' : 'A-'),
-        avatar: progress.avatar || '⭐',
-      }),
-    });
-
-    // If user has a registered account, also sync their full account progress
-    if (progress.isRegistered) {
-      await fetch('/api/auth/sync-progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: progress.userId,
-          points: progress.points,
-          streak: progress.streak,
-          lastCheckInDate: progress.lastCheckInDate,
-          claimedStreakDays: progress.claimedStreakDays,
-          level: progress.level,
-          levelName: progress.levelName,
-          lastSpmGrade: progress.lastSpmGrade,
-          totalSpeakingDone: progress.totalSpeakingDone,
-          totalListeningDone: progress.totalListeningDone,
-        }),
-      });
-    }
-  } catch (e) {
-    // Network errors handled silently
-  }
+  if (typeof window === 'undefined' || !progress.isRegistered) return;
+  const res=await apiFetch('/api/auth/me');
+  if(res.ok){const data=await res.json();if(data.progress)saveUserProgress(data.progress);}
 }
 
 // Fetch real participants from server
 export async function fetchServerLeaderboard(registeredOnly = false): Promise<LeaderboardEntry[]> {
   try {
-    const res = await fetch(`/api/leaderboard${registeredOnly ? '?registeredOnly=true' : ''}`);
+    const res = await apiFetch(`/api/leaderboard${registeredOnly ? '?registeredOnly=true' : ''}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.entries) ? data.entries : [];
@@ -191,7 +154,7 @@ export async function fetchServerLeaderboard(registeredOnly = false): Promise<Le
 // Clear all leaderboard entries on the server (for clean Day 1 publish)
 export async function resetServerLeaderboard(): Promise<boolean> {
   try {
-    const res = await fetch('/api/leaderboard/reset', { method: 'POST' });
+    const res = await apiFetch('/api/leaderboard/reset', { method: 'POST' });
     return res.ok;
   } catch (e) {
     console.warn('Failed to reset server leaderboard:', e);
@@ -205,18 +168,9 @@ export function addPointsToUser(
   _reason?: string,
   spmGrade?: SpmGradeInfo
 ): UserProgress {
-  const newPoints = (progress.points || 0) + pointsToAdd;
-  const tier = calculateLevel(newPoints);
-  const updated: UserProgress = {
-    ...progress,
-    points: newPoints,
-    level: tier.level,
-    levelName: tier.title,
-    ...(spmGrade ? { lastSpmGrade: spmGrade } : {}),
-  };
-  saveUserProgress(updated);
-  syncUserToServer(updated);
-  return updated;
+  // XP is committed only by server-side attempts/check-in.
+  void syncUserToServer(progress);
+  return progress;
 }
 
 export function checkDailyCheckInStatus(progressOrDate: UserProgress | string): {

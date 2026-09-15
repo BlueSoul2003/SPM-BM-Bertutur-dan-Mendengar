@@ -1,3 +1,4 @@
+import { apiFetch } from '../services/api';
 import React, { useState } from 'react';
 import {
   X,
@@ -32,6 +33,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
   onCheckInSuccess,
 }) => {
   const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError,setClaimError]=useState('');
   const [claimedJustNow, setClaimedJustNow] = useState(false);
 
   if (!isOpen) return null;
@@ -39,39 +41,17 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
   const { canClaimToday, todayDayIndex, isAlreadyClaimedToday } =
     checkDailyCheckInStatus(userProgress);
 
-  const handleClaim = () => {
-    if (!canClaimToday || isClaiming) return;
-    setIsClaiming(true);
-
-    const todayReward =
-      DAILY_STREAK_REWARDS.find((r) => r.day === todayDayIndex) ||
-      DAILY_STREAK_REWARDS[0];
-
-    const todayStr = getTodayDateString();
-    const updatedClaimedDays = [...(userProgress.claimedStreakDays || [])];
-    if (!updatedClaimedDays.includes(todayDayIndex)) {
-      updatedClaimedDays.push(todayDayIndex);
-    }
-
-    const newStreak = (userProgress.streak || 0) + 1;
-    const newPoints = userProgress.points + todayReward.xp;
-
-    const updatedProgress: UserProgress = {
-      ...userProgress,
-      points: newPoints,
-      streak: newStreak,
-      lastCheckInDate: todayStr,
-      claimedStreakDays: updatedClaimedDays,
-    };
-
-    saveUserProgress(updatedProgress);
-    syncUserToServer(updatedProgress);
-
-    setTimeout(() => {
-      setIsClaiming(false);
-      setClaimedJustNow(true);
-      onCheckInSuccess(todayReward.xp, newStreak);
-    }, 600);
+  const handleClaim = async () => {
+    if(!canClaimToday||isClaiming)return;
+    setIsClaiming(true);setClaimError('');
+    try {
+      const response=await apiFetch('/api/progress/check-in',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||'Sila cuba lagi.');
+      saveUserProgress(result.progress);setClaimedJustNow(true);
+      onCheckInSuccess(result.awarded,result.progress.streak);
+    }catch(error){setClaimError(error instanceof Error?error.message:'Sila cuba lagi.');}
+    finally{setIsClaiming(false);}
   };
 
   return (
@@ -176,6 +156,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
             })}
           </div>
 
+          {claimError && <p role="alert" className="text-rose-700 mb-3">{claimError}</p>}
           {/* Action Button */}
           {canClaimToday && !claimedJustNow ? (
             <button

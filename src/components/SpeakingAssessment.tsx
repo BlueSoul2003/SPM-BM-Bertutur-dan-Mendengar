@@ -362,7 +362,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
     } catch (error) {
       console.error(error);
       setExamPage(3);
-      setRecognitionError('Terdapat ralat semasa memproses penilaian. Sila cuba lagi.');
+      setRecognitionError('Penilaian AI tidak tersedia. Jawapan anda dikekalkan. Sila cuba lagi.');
     }
   };
 
@@ -470,7 +470,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           </div>
 
           {/* Question Presentation Card */}
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm border border-emerald-900/50">
+          <div className="practice-stimulus rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm border border-emerald-900/50">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
                 {selectedTopic.type === 'individu' ? 'Bahagian A: Ujian Individu (40 Markah)' : 'Bahagian B: Ujian Kumpulan (40 Markah)'}
@@ -540,7 +540,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               id="mula-ujian-bertutur-btn"
               type="button"
               onClick={handleStartExamFlow}
-              className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="practice-start w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>Mula Ujian Bertutur SPM</span>
