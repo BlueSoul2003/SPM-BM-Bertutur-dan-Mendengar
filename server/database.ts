@@ -11,7 +11,7 @@ export interface Database extends Queryable {
 
 export async function openDatabase(connectionString = process.env.DATABASE_URL): Promise<Database> {
   if (connectionString) {
-    const pool = new pg.Pool({ connectionString, max: 10, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
+    const pool = new pg.Pool({ connectionString, max: 2, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
     pool.on('error', () => console.error('Database connection error'));
     return {
       query: (sql, values) => pool.query(sql, values),

@@ -561,7 +561,7 @@ Skema / Jawapan Disasarkan: ${expectedAnswer || 'N/A'}`;
 });
 
 app.use('/api', (_req,res)=>res.status(404).json({error:'Endpoint tidak dijumpai.'}));
-app.use(((error:any,_req:any,res:any,_next:any)=>res.status(error.status || 500).json({error:error.status && error.status < 500 ? error.message : 'Ralat pelayan. Sila cuba lagi.'})) as express.ErrorRequestHandler);
+app.use(((error:any,_req:any,res:any,_next:any)=>{ if(!error.status || error.status>=500)console.error('API request failed',String(error.code || error.name || 'unknown').replace(/[^A-Za-z0-9_-]/g,'')); return res.status(error.status || 500).json({error:error.status && error.status < 500 ? error.message : 'Ralat pelayan. Sila cuba lagi.'}); }) as express.ErrorRequestHandler);
 
 // Vite Middleware for development & static serving for production
 async function startServer() {
