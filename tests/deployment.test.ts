@@ -5,6 +5,9 @@ import { PGlite } from '@electric-sql/pglite';
 import serverless from 'serverless-http';
 import { createApplication } from '../server/app.js';
 import type { Database } from '../server/database.js';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import { createVercelHandler } from '../api/index.js';
 
 test('deployment migration and serverless transport preserve authentication and progress',async()=>{
   const local=new PGlite();await local.waitReady;
@@ -27,5 +30,20 @@ test('deployment migration and serverless transport preserve authentication and 
     assert.equal((await request('/api/missing')).status,404);
     assert.equal((await request('/api/auth/logout',{},token)).status,200);
     assert.equal((await request('/api/auth/me',undefined,token)).status,401);
+    // Exercise the Vercel Node transport with real HTTP bodies and the same persisted account.
+    const server=createServer(createVercelHandler(async()=>app));
+    server.listen(0,'127.0.0.1');await once(server,'listening');
+    const address=server.address();assert.ok(address && typeof address!=='string');
+    const base=`http://127.0.0.1:${address.port}`;
+    try {
+      const login=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json','x-forwarded-for':'192.0.2.2'},body:JSON.stringify({email:'deployment@example.test',password:'deployment-test-password'})});
+      assert.equal(login.status,200);const session=await login.json();
+      const me=await fetch(base+'/api/auth/me',{headers:{authorization:`Bearer ${session.token}`}});
+      assert.equal(me.status,200);assert.equal((await me.json()).progress.points,20);
+      const logout=await fetch(base+'/api/auth/logout',{method:'POST',headers:{'content-type':'application/json',authorization:`Bearer ${session.token}`},body:'{}'});
+      assert.equal(logout.status,200);
+      assert.equal((await fetch(base+'/api/auth/me',{headers:{authorization:`Bearer ${session.token}`}})).status,401);
+      assert.equal((await fetch(base+'/api/missing')).status,404);
+    } finally {server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
   } finally {await db.close();}
 });

@@ -12,3 +12,4 @@ coverage/
 data/postgres/
 
 .netlify/
+.vercel/

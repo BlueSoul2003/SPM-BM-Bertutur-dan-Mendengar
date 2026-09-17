@@ -1,0 +1,7 @@
+.env*
+.codex-tmp/
+.netlify/
+data/
+tests/
+dist/
+ARCHITECTURE.md
