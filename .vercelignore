@@ -1,7 +1,7 @@
 .env*
 .codex-tmp/
 .netlify/
-data/
+/data/
 tests/
 dist/
 ARCHITECTURE.md

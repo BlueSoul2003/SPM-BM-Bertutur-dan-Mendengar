@@ -11,7 +11,13 @@ export interface Database extends Queryable {
 
 export async function openDatabase(connectionString = process.env.DATABASE_URL): Promise<Database> {
   if (connectionString) {
-    const pool = new pg.Pool({ connectionString, max: 2, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
+    const databaseUrl = new URL(connectionString);
+    // Supabase's shared pooler uses its published CA; verify both chain and hostname.
+    if (databaseUrl.hostname.endsWith('.pooler.supabase.com')) {
+      databaseUrl.searchParams.set('sslmode', 'verify-full');
+      databaseUrl.searchParams.set('sslrootcert', path.resolve('server/certs/supabase-prod-ca-2021.crt'));
+    }
+    const pool = new pg.Pool({ connectionString: databaseUrl.toString(), max: 2, connectionTimeoutMillis: 5000, statement_timeout: 10_000 });
     pool.on('error', () => console.error('Database connection error'));
     return {
       query: (sql, values) => pool.query(sql, values),

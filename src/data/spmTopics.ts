@@ -1,7 +1,7 @@
 import { ExerciseItem, DictionaryData } from "../types";
 
-export { SPM_SPEAKING_TOPICS } from "./spmSpeakingTopics";
-export { SPM_LISTENING_TRACKS } from "./spmListeningTracks";
+export { SPM_SPEAKING_TOPICS } from "./spmSpeakingTopics.js";
+export { SPM_LISTENING_TRACKS } from "./spmListeningTracks.js";
 
 export const SPM_EXERCISES: ExerciseItem[] = [
   {
