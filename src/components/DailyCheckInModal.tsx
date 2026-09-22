@@ -91,7 +91,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
           </h2>
           <p className="text-xs text-orange-100 leading-relaxed">
             Kekalkan rentak latihan setiap hari untuk mengumpul mata pertarungan
-            dan menakluki Papan Pendahulu Mingguan!
+            dan menakluki Papan Pendahulu XP!
           </p>
 
           <div className="mt-3 inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold">
@@ -192,8 +192,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
               <span className="font-semibold text-slate-800">
                 Petua Cikgu Maya:{' '}
               </span>
-              Calon SPM yang konsisten berlatih lisan 5 minit sehari terbukti
-              80% lebih tenang dan fasih semasa berdepan pentaksir SPM sebenar!
+              Luangkan beberapa minit setiap hari untuk berlatih. Baca semula jawapan anda dan pilih satu perkara untuk diperbaiki.
             </div>
           </div>
         </div>

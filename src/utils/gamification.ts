@@ -236,7 +236,7 @@ export function computeRankedLeaderboard(
     state: userProgress.state || 'Malaysia',
     points: userProgress.points || 0,
     streak: userProgress.streak || 0,
-    predictedGrade: userProgress.lastSpmGrade?.grade || (userProgress.points > 100 ? 'A' : 'A-'),
+    predictedGrade: userProgress.lastSpmGrade?.grade || '—',
     avatar: userProgress.avatar || '👨‍🎓',
     isCurrentUser: true,
     league: 'bronze',

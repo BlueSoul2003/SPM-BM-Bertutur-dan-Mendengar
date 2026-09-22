@@ -118,6 +118,8 @@ export const AiTutorChat: React.FC<AiTutorChatProps> = ({ onWordClick, onEarnPoi
     }
 
     return () => {
+      isRecordingRef.current = false;
+      if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.onresult = null; recognitionRef.current.onerror = null; }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();

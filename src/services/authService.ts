@@ -14,12 +14,12 @@ if (typeof window !== 'undefined') {
 
 export function getStoredAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+  try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; }
 }
 
 export function getStoredAuthUser(): AuthUser | null {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem(AUTH_USER_KEY);
+  let raw: string | null; try { raw = localStorage.getItem(AUTH_USER_KEY); } catch { return null; }
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -194,7 +194,7 @@ export async function fetchCurrentSession(): Promise<{
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await apiFetch('/api/auth/me', { headers });
+    const res = await apiFetch('/api/auth/me', { headers }, 10000);
     if (!res.ok) {
       if (res.status === 401) {
         clearAuthSession();
@@ -203,6 +203,7 @@ export async function fetchCurrentSession(): Promise<{
     }
 
     const data = await res.json();
+    if (getStoredAuthToken() !== token) return { user: null, progress: null };
     if (data.user) {
       saveAuthSession(token || 'guest', data.user);
       return { user: data.user, progress: data.progress };

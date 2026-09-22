@@ -126,29 +126,6 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
     showToast('Profil papan pendahulu anda telah berjaya disimpan!');
   };
 
-  const handleResetToDay1 = async () => {
-    const confirmReset = window.confirm(
-      'Adakah anda pasti mahu memadam semua memori dan memulakan semula dari Hari 1 (0 XP, 0 rentak)? Rekod sistem tiruan telah dialih keluar sepenuhnya.'
-    );
-    if (!confirmReset) return;
-
-    const askServerReset = window.confirm(
-      'Adakah anda juga mahu mengosongkan rekod papan pendahulu pelayan supaya bermula bersih untuk semua calon baru?'
-    );
-
-    if (askServerReset) {
-      await resetServerLeaderboard();
-    }
-
-    const clean = resetUserProgressToDay1();
-    onUpdateUserProgress(clean);
-    setNameInput(clean.studentName);
-    setSchoolInput(clean.schoolName);
-    setStateInput(clean.state || 'Kuala Lumpur');
-    await loadLeaderboardData();
-    showToast('Aplikasi kini bermula bersih dari Hari 1 (0 XP)!');
-  };
-
   const showToast = (msg: string) => {
     setStatusMessage(msg);
     setTimeout(() => {
@@ -242,11 +219,11 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-bold tracking-wide flex items-center gap-1.5 border border-amber-400/30">
                 <Trophy className="w-3.5 h-3.5" />
-                PAPAN PENDAHULU SEBENAR (HARI 1)
+                PAPAN PENDAHULU · JUMLAH XP
               </span>
               <span className="text-xs text-indigo-200 flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5 text-indigo-300" />
-                Baki: {timeRemainingText}
+                Jumlah terkumpul · tiada reset mingguan
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3 text-emerald-400" />
@@ -327,7 +304,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 Kedudukan
               </div>
               <div className="text-lg font-black text-amber-400">
-                #{currentUserRank}
+                {serverEntries.some(entry => entry.id === userProgress.userId) ? `#${currentUserRank}` : '—'}
               </div>
             </div>
             <div className="text-center">
@@ -415,7 +392,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                   </span>
                 </div>
                 <div className="text-emerald-200/80 text-[11px] mt-0.5">
-                  Kedudukan #{currentUserRank} dan rekod {userProgress.points} XP anda disimpan dengan selamat dalam pangkalan data pelayan.
+                  Kedudukan {serverEntries.some(entry => entry.id === userProgress.userId) ? `#${currentUserRank}` : '—'} dan rekod {userProgress.points} XP anda disimpan dengan selamat dalam pangkalan data pelayan.
                 </div>
               </div>
             </div>
@@ -494,15 +471,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             </div>
 
             <div className="flex items-center justify-between pt-1 border-t border-slate-700/60 flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={handleResetToDay1}
-                className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-1.5 border border-rose-500/30 transition-colors"
-                title="Padam semua kemajuan ujian dan mula dari Hari 1"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Kosongkan Memori (Mula Dari Hari 1)</span>
-              </button>
+
 
               <div className="flex gap-2">
                 <button

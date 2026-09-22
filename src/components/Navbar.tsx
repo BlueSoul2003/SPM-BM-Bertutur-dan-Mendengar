@@ -137,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Trophy className="w-3.5 h-3.5 text-amber-600" />
-              <span>Kedudukan Mingguan</span>
+              <span>Kedudukan XP</span>
               {!userProgress.isRegistered && <Lock className="w-3 h-3 text-amber-600 ml-0.5" />}
             </button>
 

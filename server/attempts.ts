@@ -25,6 +25,10 @@ export async function recordAttempt(db: Database, userId: string, id: string, ki
 
 export function listeningRoutes(db: Database, auth: RequestHandler) {
   const router=Router();
+  router.get('/attempts', auth, route(async (_req, res) => {
+    const rows = (await db.query('SELECT id,kind,topic,result,awarded,created_at FROM attempts WHERE user_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20', [res.locals.userId])).rows;
+    res.json({ attempts: rows.map(row => ({ id: row.id, kind: row.kind, topic: row.topic, totalScore: row.result.totalScore, maxScore: row.result.maxScore, awarded: row.awarded, createdAt: row.created_at })) });
+  }));
   router.post('/attempts/listening',auth,route(async(req,res)=>{
     const {attemptId,trackId,answers}=req.body;
     const track=SPM_LISTENING_TRACKS.find(t=>t.id===trackId);

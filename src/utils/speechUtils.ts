@@ -1,3 +1,4 @@
+import { getCapabilities } from '../services/capabilities';
 import { apiFetch } from '../services/api';
 // Authentic Malaysian Bahasa Melayu Audio Player & Web Speech Engine
 
@@ -61,9 +62,9 @@ let cachedVoices: SpeechSynthesisVoice[] = [];
 if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   try {
     cachedVoices = window.speechSynthesis.getVoices();
-    window.speechSynthesis.onvoiceschanged = () => {
+    window.speechSynthesis.addEventListener('voiceschanged', () => {
       cachedVoices = window.speechSynthesis.getVoices();
-    };
+    });
   } catch (e) {
     console.warn('SpeechSynthesis voice load error:', e);
   }
@@ -75,7 +76,7 @@ export function getMalaysianVoice(): {
   name: string;
 } {
   if (typeof window === 'undefined' || !window.speechSynthesis) {
-    return { voice: null, isExplicitlyMalaysian: false, name: 'Penyampai Audio Asli SPM (ms-MY)' };
+    return { voice: null, isExplicitlyMalaysian: false, name: 'Suara peranti tidak tersedia' };
   }
 
   let voices = cachedVoices;
@@ -95,165 +96,63 @@ export function getMalaysianVoice(): {
   return {
     voice: null,
     isExplicitlyMalaysian: false,
-    name: 'Penyampai Audio Tulen SPM (Bahasa Melayu Baku)'
+    name: 'Suara lalai peranti (sebutan mungkin berbeza)'
   };
 }
 
-/**
- * Primary Native Malaysian Bahasa Melayu Speech Synthesizer.
- * Streams genuine native Malaysian Malay audio directly from the backend /api/tts endpoint.
- * This guarantees authentic pronunciation on all devices and OS without falling back
- * to foreign/English accents.
- */
-export function speakMalayText(
-  text: string,
-  onEnd?: () => void,
-  rate = 1.0,
-  pitch = 1.0
-): () => void {
-  // Cancel any ongoing audio
+/** Plays configured cloud audio or device speech, with cancellation and bounded resources. */
+export function speakMalayText(text: string, onEnd?: () => void, rate = 1, pitch = 1, onError?: (message: string) => void): () => void {
   stopSpeaking();
-
-  const cleanText = text
-    .replace(/[*#_~`]/g, '')
-    .replace(/\[JEDA\]/gi, ', ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!cleanText) {
-    if (onEnd) onEnd();
-    return () => {};
-  }
-
-  // Abort controller to cancel network fetch if user stops prematurely
-  currentAbortController = new AbortController();
-  const signal = currentAbortController.signal;
-
-  let isCancelled = false;
-  let hasEnded = false;
-
-  const audio = new Audio();
-  currentAudioPlayer = audio;
-  audio.playbackRate = rate;
-
-  const finish = () => {
-    if (!hasEnded) {
-      hasEnded = true;
-      if (currentAudioPlayer === audio) {
-        currentAudioPlayer = null;
-      }
-      if (onEnd && !isCancelled) onEnd();
-    }
+  const cleanText = text.replace(/[*#_~`]/g, '').replace(/\[JEDA\]/gi, ', ').replace(/\s+/g, ' ').trim();
+  const controller = new AbortController(); currentAbortController = controller;
+  let objectUrl: string | undefined;
+  let ended = false;
+  const done = (error?: string) => {
+    if (ended || controller.signal.aborted) return;
+    ended = true;
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = undefined; }
+    if (currentAbortController === controller) { currentAudioPlayer = null; currentAbortController = null; }
+    if (error && onError) onError(error); else onEnd?.();
   };
-
-  audio.onended = finish;
-  audio.onerror = (e) => {
-    // Crucial: if audio was aborted or stopped or replaced, do NOT trigger fallback speech!
-    if (isCancelled || hasEnded || currentAudioPlayer !== audio || !audio.src) {
-      return;
-    }
-    console.warn('Audio playback error, trying synthesis fallback:', e);
-    fallbackBrowserSpeech(cleanText, finish, rate, pitch);
+  const cancel = () => {
+    controller.abort();
+    if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = undefined; }
   };
-
-  {
-    // Fetch all audio with the bearer token; media URLs cannot attach headers.
-    apiFetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: cleanText }),
-      signal
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`TTS server response: ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
-        if (signal.aborted || isCancelled || currentAudioPlayer !== audio) return;
-        const objectUrl = URL.createObjectURL(blob);
-        audio.src = objectUrl;
-        audio.play().catch((err) => {
-          if (err.name !== 'AbortError' && !isCancelled && currentAudioPlayer === audio) {
-            console.warn('Audio play failed:', err);
-            finish();
-          }
-        });
-      })
-      .catch((err) => {
-        if (err.name !== 'AbortError' && !isCancelled && currentAudioPlayer === audio) {
-          console.warn('Failed to fetch TTS audio:', err);
-          fallbackBrowserSpeech(cleanText, finish, rate, pitch);
-        }
-      });
-  }
-
-  return () => {
-    isCancelled = true;
-    stopSpeaking();
-  };
-}
-
-function fallbackBrowserSpeech(
-  cleanText: string,
-  onFinish: () => void,
-  rate = 0.92,
-  pitch = 1.0
-) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) {
-    onFinish();
-    return;
-  }
-  try {
-    window.speechSynthesis.cancel();
+  controller.signal.addEventListener('abort', () => { if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = undefined; } }, { once: true });
+  let deviceStarted = false;
+  const deviceSpeech = () => {
+    if (controller.signal.aborted || deviceStarted) return;
+    deviceStarted = true;
+    if (!window.speechSynthesis) { done('Audio tidak disokong. Gunakan teks petikan.'); return; }
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = 'ms-MY';
-    utterance.rate = rate;
-    utterance.pitch = pitch;
-
-    const { voice } = getMalaysianVoice();
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    utterance.onend = onFinish;
-    utterance.onerror = onFinish;
+    utterance.lang = 'ms-MY'; utterance.rate = rate; utterance.pitch = pitch;
+    const { voice } = getMalaysianVoice(); if (voice) utterance.voice = voice;
+    utterance.onend = () => done();
+    utterance.onerror = () => done('Suara peranti tidak tersedia. Cuba pelayar lain atau gunakan teks petikan.');
     window.speechSynthesis.speak(utterance);
-  } catch (err) {
-    console.warn('Fallback speech error:', err);
-    onFinish();
-  }
+  };
+  if (!cleanText) { done(); return cancel; }
+  // Device playback stays inside the user's click, avoiding mobile autoplay rejection.
+  if (!getCapabilities().cloudAudio) { deviceSpeech(); return () => { if (currentAbortController === controller) stopSpeaking(); else cancel(); }; }
+  const audio = new Audio(); currentAudioPlayer = audio; audio.playbackRate = rate;
+  audio.onended = () => done(); audio.onerror = deviceSpeech;
+  void apiFetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: cleanText }), signal: controller.signal }, 25000)
+    .then(async response => { if (!response.ok) throw new Error('Audio unavailable'); return response.blob(); })
+    .then(async blob => {
+      if (controller.signal.aborted) return;
+      objectUrl = URL.createObjectURL(blob); audio.src = objectUrl; await audio.play();
+    }).catch(() => { if (!controller.signal.aborted) deviceSpeech(); });
+  return () => { if (currentAbortController === controller) stopSpeaking(); else cancel(); };
 }
 
-/**
- * Halts all active audio elements and browser speech synthesis.
- */
 export function stopSpeaking(): void {
-  if (currentAbortController) {
-    try {
-      currentAbortController.abort();
-    } catch (e) {}
-    currentAbortController = null;
-  }
-
+  currentAbortController?.abort(); currentAbortController = null;
   if (currentAudioPlayer) {
-    try {
-      // Detach event listeners BEFORE clearing src so error event won't trigger fallback speech!
-      currentAudioPlayer.onended = null;
-      currentAudioPlayer.onerror = null;
-      currentAudioPlayer.pause();
-      currentAudioPlayer.currentTime = 0;
-      currentAudioPlayer.src = '';
-    } catch (e) {}
-    currentAudioPlayer = null;
+    currentAudioPlayer.onended = null; currentAudioPlayer.onerror = null;
+    currentAudioPlayer.pause(); currentAudioPlayer.src = ''; currentAudioPlayer = null;
   }
-
-  if (typeof window !== 'undefined' && window.speechSynthesis) {
-    try {
-      window.speechSynthesis.cancel();
-    } catch (e) {}
-  }
+  if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
 }
-
 export function isAudioPlaying(): boolean {
-  return currentAudioPlayer !== null && !currentAudioPlayer.paused;
+  return !!currentAudioPlayer && !currentAudioPlayer.paused || !!(typeof window !== 'undefined' && window.speechSynthesis?.speaking);
 }

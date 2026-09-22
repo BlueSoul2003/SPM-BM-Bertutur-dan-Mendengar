@@ -47,6 +47,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   const [submitting,setSubmitting]=useState(false);
   const [submissionError,setSubmissionError]=useState('');
   const [serverScore,setServerScore]=useState<number|null>(null);
+  const [audioError, setAudioError] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [showTranscript, setShowTranscript] = useState(false);
   const [speed, setSpeed] = useState<number>(1.0);
@@ -112,6 +113,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
       stopSpeaking();
       setIsPlaying(false);
     } else {
+      setAudioError('');
       setIsPlaying(true);
       const textToSpeak = `Kertas 4, Peperiksaan SPM Bahasa Melayu. Petikan Mendengar, ${selectedTrack.title}. ${selectedTrack.script}`;
 
@@ -123,7 +125,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
             setListeningRound(2);
           }
         },
-        speed
+        speed, 1, message => { setIsPlaying(false); setAudioError(message); }
       );
     }
   };
@@ -182,6 +184,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4 font-sans pb-12">
+      {audioError && <p role="alert" className="bg-amber-50 p-3 rounded-xl text-sm">{audioError}</p>}
       {/* ========================================================================= */}
       {/* HALAMAN 1: PILIH SET UJIAN MENDENGAR (52 SET LENGKAP)                     */}
       {/* ========================================================================= */}
@@ -204,14 +207,14 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-teal-200 mt-0.5">
-                    Format Rasmi Lembaga Peperiksaan Malaysia &bull; 30 Markah &bull; 52 Set Praktis
+                    Latihan kendiri berdasarkan format SPM &bull; 30 Markah &bull; 52 Set Praktis
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-xl border border-white/15 text-emerald-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-semibold">🇲🇾 Suara Melayu Standard</span>
+                <span className="font-semibold">🇲🇾 Suara peranti · bergantung pada pelayar</span>
               </div>
             </div>
 
@@ -312,7 +315,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
       )}
 
       {/* ========================================================================= */}
-      {/* HALAMAN 2: AUDIO PLAYER & SOALAN FORMAT RASMI SPM (1103/4)                */}
+      {/* HALAMAN 2: AUDIO PLAYER & SOALAN LATIHAN SPM (1103/4)                */}
       {/* ========================================================================= */}
       {currentPage === 'exam_session' && (
         <div className="space-y-4 animate-in fade-in duration-200">
@@ -499,7 +502,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                         </div>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200 shrink-0">
-                        {question.marks || 1} Markah
+                        1 Markah
                       </span>
                     </div>
 
@@ -652,7 +655,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                   }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Hantar & Semak Jawapan SPM (Skema LPM)</span>
+                  <span>Hantar & Semak Jawapan SPM (Semakan Latihan)</span>
                 </button>
               </div>
             ) : (

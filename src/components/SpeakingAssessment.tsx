@@ -1,3 +1,6 @@
+import { getStoredAuthUser } from '../services/authService';
+import { SpeakingReview } from './SpeakingReview';
+import { useCapabilities } from '../services/capabilities';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Mic,
@@ -48,10 +51,13 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
   onWordClick,
   onEarnPoints,
 }) => {
-  const [selectedTopic, setSelectedTopic] = useState<SpeakingTopic>(SPM_SPEAKING_TOPICS[0]);
+  const capabilities = useCapabilities();
+  const draftKey = `bual-speaking-draft:${getStoredAuthUser()?.id || 'guest'}`;
+  const [draft] = useState(() => { try { return JSON.parse(sessionStorage.getItem(draftKey) || 'null'); } catch { return null; } });
+  const [selectedTopic, setSelectedTopic] = useState<SpeakingTopic>(() => SPM_SPEAKING_TOPICS.find(topic => topic.id === draft?.topicId) || SPM_SPEAKING_TOPICS[0]);
 
   // 3-Page Flow State: 1 = Mula & Soalan, 2 = Persediaan & Bahan Rangsangan, 3 = Audio Soalan & Menjawab, 'evaluating' | 'result'
-  const [examPage, setExamPage] = useState<1 | 2 | 3 | 'evaluating' | 'result'>(1);
+  const [examPage, setExamPage] = useState<1 | 2 | 3 | 'evaluating' | 'result' | 'self-review'>(1);
   
   // Timers: LPM SPM Format (Persediaan: 60 saat, Menjawab: 180 saat)
   const [prepTimeLeft, setPrepTimeLeft] = useState(60);
@@ -65,7 +71,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
   const [audioPlayingText, setAudioPlayingText] = useState<string | null>(null);
 
   // Recording & Transcription
-  const [spokenTranscript, setSpokenTranscript] = useState('');
+  const [spokenTranscript, setSpokenTranscript] = useState(typeof draft?.answer === 'string' ? draft.answer.slice(0, 5000) : '');
   const [isRecording, setIsRecording] = useState(false);
   const [recognitionError, setRecognitionError] = useState<string | null>(null);
 
@@ -79,13 +85,14 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
   // Scale modal toggle
   const [showScaleModal, setShowScaleModal] = useState(false);
 
+  const delayedActions = useRef<ReturnType<typeof setTimeout>[]>([]);
   const recognitionRef = useRef<any>(null);
   const prepTimerRef = useRef<any>(null);
   const speakTimerRef = useRef<any>(null);
 
   // Robust speech recognition tracking refs to prevent word repetitions and lost phrases
   const isRecordingRef = useRef(false);
-  const baseTranscriptRef = useRef('');
+  const baseTranscriptRef = useRef(spokenTranscript);
   const finalTranscriptRef = useRef('');
   const interimTranscriptRef = useRef('');
   const isProceedingRef = useRef(false);
@@ -129,6 +136,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       };
 
       recog.onerror = (event: any) => {
+        isRecordingRef.current = false; setIsRecording(false);
         if (event.error === 'not-allowed') {
           setRecognitionError('Kebenaran mikrofon diperlukan. Sila benarkan akses mikrofon dalam pelayar anda.');
         } else if (event.error !== 'no-speech') {
@@ -159,13 +167,23 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       recognitionRef.current = recog;
     }
 
-    if (window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = () => {
-        setVoiceDetails(getMalaysianVoice());
-      };
-    }
+    const pauseWhenHidden = () => {
+      if (document.hidden) {
+        isRecordingRef.current = false; setIsRecording(false);
+        try { recognitionRef.current?.stop(); } catch {}
+        stopSpeaking(); setIsPlayingAudio(false); setAudioPlayingText(null);
+      }
+    };
+    document.addEventListener('visibilitychange', pauseWhenHidden);
+    const updateVoice = () => setVoiceDetails(getMalaysianVoice());
+    window.speechSynthesis?.addEventListener('voiceschanged', updateVoice);
 
     return () => {
+      document.removeEventListener('visibilitychange', pauseWhenHidden);
+      window.speechSynthesis?.removeEventListener('voiceschanged', updateVoice);
+      delayedActions.current.forEach(clearTimeout);
+      isRecordingRef.current = false;
+      if (recognitionRef.current) { recognitionRef.current.onend = null; recognitionRef.current.onresult = null; recognitionRef.current.onerror = null; }
       stopSpeaking();
       clearInterval(prepTimerRef.current);
       clearInterval(speakTimerRef.current);
@@ -177,16 +195,17 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
     };
   }, []);
 
-  // Cleanup on unmount or topic change
+  const previousTopic = useRef(selectedTopic.id);
   useEffect(() => {
-    handleResetToPage1();
+    if (previousTopic.current !== selectedTopic.id) { handleResetToPage1(); previousTopic.current = selectedTopic.id; }
   }, [selectedTopic]);
+  useEffect(() => { try { sessionStorage.setItem(draftKey, JSON.stringify({ topicId: selectedTopic.id, answer: spokenTranscript })); } catch {} }, [draftKey, selectedTopic.id, spokenTranscript]);
 
   // Primary question string
   const primaryQuestion =
     selectedTopic.guideQuestions && selectedTopic.guideQuestions.length > 0
       ? selectedTopic.guideQuestions[0]
-      : selectedTopic.description;
+      : selectedTopic.title;
 
   // Speak audio using native Malay TTS
   const handlePlayPromptAudio = (text: string) => {
@@ -220,9 +239,10 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
     speakMalayText('Masa persediaan bermula. Sila teliti bahan rangsangan sebelum menjawab.');
 
     clearInterval(prepTimerRef.current);
+    const prepDeadline = Date.now() + initialPrep * 1000;
     let remaining = initialPrep;
     prepTimerRef.current = setInterval(() => {
-      remaining -= 1;
+      remaining = Math.max(0, Math.ceil((prepDeadline - Date.now()) / 1000));
       if (remaining <= 0) {
         clearInterval(prepTimerRef.current);
         setPrepTimeLeft(0);
@@ -239,28 +259,25 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
   const handleAutoProceedToPage3 = () => {
     if (isProceedingRef.current) return;
     isProceedingRef.current = true;
-    setTimeout(() => {
-      isProceedingRef.current = false;
-    }, 1500);
+    delayedActions.current.push(setTimeout(() => { isProceedingRef.current = false; }, 1500));
 
     clearInterval(prepTimerRef.current);
     stopSpeaking();
     setIsPlayingAudio(false);
     setAudioPlayingText(null);
     setExamPage(3);
-    const initialSpeak = Math.min(selectedTopic.speakingTimeSeconds || 120,120);
+    const initialSpeak = Math.min(selectedTopic.speakTimeSeconds || 120,120);
     setSpeakTimeLeft(initialSpeak);
 
     // Auto-play the examiner question with native Malaysian voice after previous audio cleanup
     const questionTextToSpeak = `Soalan Pentaksir SPM: ${primaryQuestion}`;
-    setTimeout(() => {
-      handlePlayPromptAudio(questionTextToSpeak);
-    }, 200);
+    delayedActions.current.push(setTimeout(() => { handlePlayPromptAudio(questionTextToSpeak); }, 200));
 
     clearInterval(speakTimerRef.current);
+    const speakDeadline = Date.now() + initialSpeak * 1000;
     let speakRemaining = initialSpeak;
     speakTimerRef.current = setInterval(() => {
-      speakRemaining -= 1;
+      speakRemaining = Math.max(0, Math.ceil((speakDeadline - Date.now()) / 1000));
       if (speakRemaining <= 0) {
         clearInterval(speakTimerRef.current);
         setSpeakTimeLeft(0);
@@ -313,8 +330,9 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       setRecognitionError(null);
       try {
         recognitionRef.current.start();
-      } catch (e) {
-        console.warn(e);
+      } catch {
+        isRecordingRef.current = false; setIsRecording(false);
+        setRecognitionError('Mikrofon tidak dapat dimulakan. Cuba lagi atau taip jawapan anda.');
       }
     }
   };
@@ -339,6 +357,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       return;
     }
 
+    if (!capabilities.ai) { setExamPage('self-review'); return; }
     setExamPage('evaluating');
 
     try {
@@ -373,6 +392,9 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
 
   // Reset back to Page 1
   const handleResetToPage1 = () => {
+    delayedActions.current.forEach(clearTimeout); delayedActions.current = []; isProceedingRef.current = false;
+    isRecordingRef.current = false;
+    baseTranscriptRef.current = ''; finalTranscriptRef.current = ''; interimTranscriptRef.current = '';
     stopSpeaking();
     clearInterval(prepTimerRef.current);
     clearInterval(speakTimerRef.current);
@@ -414,7 +436,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             <div className="flex items-center gap-1 text-[10px] text-slate-500 truncate">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="truncate" title={voiceDetails.name}>
-                🇲🇾 Suara: Bahasa Melayu (Malaysia)
+                {voiceDetails.isExplicitlyMalaysian ? 'Suara Melayu peranti' : 'Suara lalai peranti'}
               </span>
             </div>
           </div>
@@ -847,8 +869,12 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               </div>
             )}
 
+<p className="text-xs text-stone-500">Pengecaman suara mungkin diproses oleh penyedia pelayar anda. Anda boleh menaip jawapan tanpa menggunakan mikrofon.</p>
             {/* Real-time transcript textarea */}
             <textarea
+              aria-label="Jawapan pertuturan"
+              maxLength={5000}
+              readOnly={isRecording}
               value={spokenTranscript}
               onChange={(e) => {
                 setSpokenTranscript(e.target.value);
@@ -872,7 +898,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               }`}
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>Hantar & Nilai Jawapan SPM (Skema LPM)</span>
+              <span>{capabilities.ai ? 'Hantar untuk penilaian AI' : 'Selesai & semak sendiri'}</span>
             </button>
           </div>
         </div>
@@ -881,13 +907,14 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
       {/* ========================================================================================= */}
       {/* EVALUATING STATE: Clean Spinner                                                           */}
       {/* ========================================================================================= */}
+      {examPage === 'self-review' && <SpeakingReview topicId={selectedTopic.id} title={selectedTopic.title} answer={spokenTranscript} onBack={() => setExamPage(3)} onRestart={handleResetToPage1}/>}
       {examPage === 'evaluating' && (
         <div className="bg-white rounded-3xl p-8 sm:p-10 text-center border border-slate-200 shadow-sm space-y-3 animate-in fade-in">
           <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center mx-auto shadow-inner">
             <Loader2 className="w-7 h-7 animate-spin" />
           </div>
           <h3 className="text-base sm:text-lg font-bold font-serif text-slate-900">
-            Ketua Pentaksir Sedang Menilai Respon Anda...
+            AI sedang menyediakan maklum balas...
           </h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             Menilai Tatabahasa & Kosa Kata (20m), Sebutan & Intonasi (10m), serta Kefasihan & Makna (10m) mengikut rubrik rasmi LPM SPM.
@@ -905,7 +932,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1">
                 <Award className="w-3.5 h-3.5" />
-                Keputusan Rasmi SPM 1103/3
+                Keputusan Latihan 1103/3
               </span>
               <h3 className="text-base sm:text-lg font-bold font-serif text-white">
                 {calculatedGrade.label}

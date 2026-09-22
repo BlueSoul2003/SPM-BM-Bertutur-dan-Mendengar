@@ -1,3 +1,4 @@
+import { publicCapabilities } from './capabilities.js';
 import { metered, usageStatus, type AiFeature } from './usage.js';
 import { billingRoutes } from './billing.js';
 import { recoveryRoutes } from './recovery.js';
@@ -124,6 +125,8 @@ async function generateWithModelFallback(
 
 // In-memory dictionary cache to provide sub-millisecond responses and ensure consistency
 const serverDictCache = new Map<string, any>();
+
+app.get('/api/capabilities', (_req, res) => res.json(publicCapabilities()));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

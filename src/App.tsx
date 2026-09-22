@@ -1,3 +1,5 @@
+import { PracticeHistory } from './components/PracticeHistory';
+import { useCapabilities } from './services/capabilities';
 import { RecoveryView } from './components/RecoveryView';
 import { SubscriptionStatus } from './components/SubscriptionStatus';
 import { LearningGreeting } from './components/LearningGreeting';
@@ -38,6 +40,8 @@ const WORD_BANK_STORAGE_KEY = 'spm_bm_word_bank_v1';
 const PREF_LANG_STORAGE_KEY = 'spm_bm_pref_lang_v1';
 
 export default function App() {
+  const capabilities = useCapabilities();
+  const [sessionLoading, setSessionLoading] = useState(true);
   const [resetToken,setResetToken]=useState(()=>new URLSearchParams(window.location.search).get('reset')||'');
   const [isRecovering,setIsRecovering]=useState(false);
   useEffect(()=>{if(resetToken)window.history.replaceState({},'',window.location.pathname);},[resetToken]);
@@ -92,9 +96,19 @@ export default function App() {
         }
       } catch (e) {
         console.warn('Session verification error:', e);
-      }
+      } finally { setSessionLoading(false); }
     };
     checkSession();
+  }, []);
+
+  const wordBankStorageKey = `${WORD_BANK_STORAGE_KEY}:${userProgress.isRegistered ? userProgress.userId : 'guest'}`;
+
+  useEffect(() => {
+    const clear = () => { setUserProgress(getInitialProgress()); setIsWordBankOpen(false); setSelectedWord(null); setIsDailyCheckInOpen(false); setPointsToast(null); };
+    window.addEventListener('session-expired', clear);
+    const changed = (event: StorageEvent) => { if (event.key === 'spm_bm_auth_token_day1') window.location.reload(); };
+    window.addEventListener('storage', changed);
+    return () => { window.removeEventListener('session-expired', clear); window.removeEventListener('storage', changed); };
   }, []);
 
   // Load preferences, wordbank, and prompt daily check-in on first load if available
@@ -103,7 +117,7 @@ export default function App() {
       const savedLang = localStorage.getItem(PREF_LANG_STORAGE_KEY) as TargetLanguage;
       if (savedLang) setPreferredLang(savedLang);
 
-      const savedBank = localStorage.getItem(WORD_BANK_STORAGE_KEY);
+      const savedBank = localStorage.getItem(wordBankStorageKey);
       if (savedBank) {
         setWordBank(JSON.parse(savedBank));
       } else {
@@ -145,7 +159,7 @@ export default function App() {
           }
         ];
         setWordBank(initialSeed);
-        localStorage.setItem(WORD_BANK_STORAGE_KEY, JSON.stringify(initialSeed));
+        localStorage.setItem(wordBankStorageKey, JSON.stringify(initialSeed));
       }
 
       // Check if eligible for daily check-in
@@ -158,9 +172,10 @@ export default function App() {
         return () => clearTimeout(timer);
       }
     } catch (e) {
+      setWordBank([]);
       console.warn('Storage read error:', e);
     }
-  }, []);
+  }, [wordBankStorageKey]);
 
   const handleLanguageChange = (lang: TargetLanguage) => {
     setPreferredLang(lang);
@@ -191,7 +206,7 @@ export default function App() {
         handleEarnPoints(5, `Menyimpan Kosa Kata Baru: "${item.word}"`);
       }
       try {
-        localStorage.setItem(WORD_BANK_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(wordBankStorageKey, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -201,7 +216,7 @@ export default function App() {
     setWordBank((prev) => {
       const updated = prev.filter((w) => w.word.toLowerCase() !== word.toLowerCase());
       try {
-        localStorage.setItem(WORD_BANK_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(wordBankStorageKey, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -223,7 +238,7 @@ export default function App() {
         return w;
       });
       try {
-        localStorage.setItem(WORD_BANK_STORAGE_KEY, JSON.stringify(updated));
+        localStorage.setItem(wordBankStorageKey, JSON.stringify(updated));
       } catch (e) {}
       return updated;
     });
@@ -305,7 +320,7 @@ export default function App() {
 
   // Compute current user ranking for mobile bottom navigation pill
   const leaderboardData = getWeeklyLeaderboard(userProgress);
-  const currentRank = leaderboardData.currentUserRank;
+  const currentRank = 0; // A local-only list cannot establish a global ranking.
 
   if(resetToken||isRecovering)return <RecoveryView token={resetToken||undefined} onBack={()=>{setResetToken('');setIsRecovering(false);}}/>;
 
@@ -339,7 +354,7 @@ export default function App() {
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-amber-400 tracking-wide">
-                  +{pointsToast.points} XP Diperoleh!
+                  {pointsToast.points > 0 ? `+${pointsToast.points} XP Diperoleh!` : 'Makluman'}
                 </span>
                 {pointsToast.spmGrade && (
                   <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black">
@@ -363,7 +378,7 @@ export default function App() {
 
       {/* Main Content View (Mandatory registration gate enforced) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 lg:pb-8">
-        {!userProgress.isRegistered ? (
+        {sessionLoading ? <div className="loading-card" role="status">Menyediakan akaun anda…</div> : !userProgress.isRegistered ? (
           <AuthGateView
             onRecover={()=>setIsRecovering(true)}
             currentUserProgress={userProgress}
@@ -372,6 +387,7 @@ export default function App() {
         ) : (
           <Suspense fallback={<div className="loading-card" role="status">Menyediakan ruang belajar...</div>}>
             <SubscriptionStatus/>
+            <PracticeHistory key={userProgress.userId}/>
             <LearningGreeting activeTab={activeTab}/>
             {activeTab === 'speaking' && (
               <SpeakingAssessment
@@ -388,10 +404,10 @@ export default function App() {
             )}
 
             {activeTab === 'tutor' && (
-              <AiTutorChat
+              capabilities.ai ? <AiTutorChat
                 onWordClick={handleWordClick}
                 onEarnPoints={handleEarnPoints}
-              />
+              /> : <section className="welcome-account space-y-4"><h2 className="text-xl font-bold">Cikgu AI belum dibuka</h2><p>Anda masih boleh berlatih bertutur, membaca contoh jawapan dan menyemak kefahaman mendengar secara percuma.</p><button className="practice-start rounded-xl p-3 text-white" onClick={() => setActiveTab('speaking')}>Mula latihan kendiri</button></section>
             )}
 
             {activeTab === 'leaderboard' && (
