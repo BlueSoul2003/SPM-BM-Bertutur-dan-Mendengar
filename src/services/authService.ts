@@ -43,6 +43,7 @@ export function clearAuthSession(): void {
 export function logout(): void {
   void apiFetch('/api/auth/logout', { method: 'POST' }, 10_000).catch(() => {});
   clearAuthSession();
+  window.dispatchEvent(new Event('session-expired'));
 }
 
 export interface RegisterPayload {

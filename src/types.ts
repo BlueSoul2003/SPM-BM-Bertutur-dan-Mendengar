@@ -52,7 +52,7 @@ export interface AuthUser {
   avatar: string;
   createdAt: string;
   isRegistered: boolean;
-  authProvider?: 'email' | 'google';
+  authProvider?: 'email' | 'google' | 'interactive-course';
 }
 
 export interface UserProgress {
@@ -70,7 +70,7 @@ export interface UserProgress {
   avatar?: string;
   username?: string;
   isRegistered?: boolean;
-  authProvider?: 'email' | 'google';
+  authProvider?: 'email' | 'google' | 'interactive-course';
   totalSpeakingDone: number;
   totalListeningDone: number;
   totalExercisesDone: number;
@@ -90,7 +90,7 @@ export interface LeaderboardEntry {
   avatar: string;
   username?: string;
   isRegistered?: boolean;
-  authProvider?: 'email' | 'google';
+  authProvider?: 'email' | 'google' | 'interactive-course';
   isCurrentUser?: boolean;
   league: 'diamond' | 'gold' | 'silver' | 'bronze';
   trend?: 'up' | 'down' | 'same';

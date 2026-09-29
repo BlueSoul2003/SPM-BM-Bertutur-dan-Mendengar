@@ -1,4 +1,6 @@
 import { publicCapabilities } from './capabilities.js';
+import { courseRoutes } from './course-auth.js';
+import { courseEnabled } from './course-config.js';
 import { metered, usageStatus, type AiFeature } from './usage.js';
 import { billingRoutes } from './billing.js';
 import { recoveryRoutes } from './recovery.js';
@@ -44,6 +46,12 @@ const billingReady=routesReady.then(({db,auth})=>billingRoutes(db,auth));
 app.use('/api',route(async(req,res,next)=>(await billingReady).webhook(req,res,next)));
 app.use(express.json({ limit: '64kb' }));
 app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); res.setHeader('X-Content-Type-Options', 'nosniff'); next(); });
+const courseReady = databaseReady.then(db => courseRoutes(db));
+app.use('/api/course', route(async(req,res,next)=>(await courseReady)(req,res,next)));
+app.use(['/api/auth/register','/api/auth/login','/api/auth/forgot-password','/api/auth/reset-password'], (_req,res,next)=>{
+  if (courseEnabled()) return res.status(410).json({error:'Gunakan akaun interactive-course. Kata laluan Bual lama hanya untuk menyambung rekod.'});
+  next();
+});
 app.use(['/api/auth/register', '/api/auth/login'], sharedLimit('auth',20,900), concurrencyLimit(4));
 app.use(['/api/gemini', '/api/tts'], authenticated, sharedLimit('ai',30,60), concurrencyLimit(8));
 app.use(['/api/auth/update-profile', '/api/auth/sync-progress', '/api/leaderboard/sync'], authenticated);

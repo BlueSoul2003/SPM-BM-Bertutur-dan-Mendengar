@@ -1,5 +1,11 @@
 CREATE TABLE IF NOT EXISTS schema_versions (version integer PRIMARY KEY);
 
+CREATE TABLE IF NOT EXISTS course_login_codes (
+  code_hash text PRIMARY KEY, kind text NOT NULL CHECK(kind IN ('login','setup')),
+  challenge text NOT NULL, subject text NOT NULL, email text NOT NULL,
+  expires_at timestamptz NOT NULL, session_expires_at timestamptz NOT NULL);
+CREATE INDEX IF NOT EXISTS course_codes_expiry ON course_login_codes(expires_at);
+
 CREATE TABLE IF NOT EXISTS accounts (
       id text PRIMARY KEY, email text NOT NULL UNIQUE, username text NOT NULL UNIQUE,
       password_hash text, salt text, profile jsonb NOT NULL DEFAULT '{}',
@@ -11,6 +17,11 @@ CREATE TABLE IF NOT EXISTS accounts (
 CREATE TABLE IF NOT EXISTS sessions (
       token_hash text PRIMARY KEY, user_id text NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
       expires_at timestamptz NOT NULL);
+
+CREATE TABLE IF NOT EXISTS course_links (
+  subject text PRIMARY KEY, user_id text NOT NULL UNIQUE REFERENCES accounts(id),
+  linked_at timestamptz NOT NULL DEFAULT now());
+INSERT INTO schema_versions(version) VALUES (3) ON CONFLICT DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
 
@@ -48,3 +59,20 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 CREATE INDEX IF NOT EXISTS ai_usage_day ON ai_usage(day,user_id,feature);
 
 INSERT INTO schema_versions(version) VALUES (1),(2) ON CONFLICT DO NOTHING;
+
+-- Production runs with search_path=bual. Local PGlite runs use public and its
+-- owner role. These new private tables follow the existing backend-only policy.
+DO $$
+DECLARE t text;
+BEGIN
+  IF current_schema() = 'bual' AND EXISTS (SELECT 1 FROM pg_roles WHERE rolname='bual_api') THEN
+    FOREACH t IN ARRAY ARRAY['course_links','course_login_codes'] LOOP
+      EXECUTE format('ALTER TABLE bual.%I ENABLE ROW LEVEL SECURITY',t);
+      EXECUTE format('REVOKE ALL ON bual.%I FROM PUBLIC, anon, authenticated',t);
+      EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON bual.%I TO bual_api',t);
+      IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='bual' AND tablename=t AND policyname='backend_access') THEN
+        EXECUTE format('CREATE POLICY backend_access ON bual.%I FOR ALL TO bual_api USING (true) WITH CHECK (true)',t);
+      END IF;
+    END LOOP;
+  END IF;
+END $$;

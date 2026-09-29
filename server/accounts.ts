@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Database, Queryable } from './database.js';
 import { hashPassword, verifyPassword, bearer } from './security.js';
+import { courseEnabled } from './course-config.js';
 
 export const digest = (s: string) => createHash('sha256').update(s).digest('hex');
 export const route = (fn: (...args: any[]) => Promise<any>): RequestHandler => (req, res, next) => { Promise.resolve(fn(req, res, next)).catch(next); };
@@ -12,12 +13,12 @@ export function progress(row: any) {
   const thresholds = [0,150,400,800,1400,2200];
   const names = ['Pemula Bahasa','Penutur Asas','Penutur Mahir','Cemerlang SPM','Wira Debat SPM','Juara Kebangsaan SPM'];
   const level = thresholds.filter(n => row.points >= n).length;
-  return { ...row.profile, userId: row.id, email: row.email, username: row.username, points: row.points, streak: row.streak,
+  return { ...row.profile, userId: row.id, email: row.profile.portalEmail || row.email, username: row.username, points: row.points, streak: row.streak,
     lastCheckInDate: row.last_checkin, claimedStreakDays: Array.from({length: row.streak ? ((row.streak - 1) % 7) + 1 : 0}, (_,i) => i+1),
     level, levelName: names[level-1], totalSpeakingDone: row.speaking_done, totalListeningDone: row.listening_done,
     totalExercisesDone: row.speaking_done + row.listening_done, lastSpmGrade: row.last_grade, isRegistered: true };
 }
-export function publicUser(row: any) { return { ...row.profile, id: row.id, email: row.email, username: row.username, createdAt: row.created_at, isRegistered: true }; }
+export function publicUser(row: any) { return { ...row.profile, id: row.id, email: row.profile.portalEmail || row.email, username: row.username, createdAt: row.created_at, isRegistered: true }; }
 export async function account(db: Queryable, id: string, lock = false) {
   return (await db.query(`SELECT * FROM accounts WHERE id=$1${lock ? ' FOR UPDATE' : ''}`, [id])).rows[0];
 }
@@ -71,6 +72,7 @@ export function sharedRateLimit(db: Database, scope: string, max: number, second
 export function accountRoutes(db: Database, sessions: PersistentSessions) {
   const router = Router();
   const auth: RequestHandler = route(async(req,res,next) => {
+    if (courseEnabled() && !bearer(req).startsWith('ic.')) return res.status(401).json({error:'Sila log masuk melalui interactive-course.'});
     const id = await sessions.get(bearer(req));
     if (!id) return res.status(401).json({error:'Sesi telah tamat. Sila log masuk semula.'});
     if(req.body?.userId && req.body.userId!==id) return res.status(403).json({error:'Akses akaun tidak dibenarkan.'});
