@@ -56,6 +56,13 @@ test('deployment migration and serverless transport preserve authentication and 
       assert.equal(logout.status,200);
       assert.equal((await fetch(base+'/api/auth/me',{headers:{authorization:`Bearer ${session.token}`}})).status,401);
       assert.equal((await fetch(base+'/api/missing')).status,404);
+      process.env.COURSE_SSO_ENABLED='true';
+      try {
+        for(const endpoint of ['register','login','forgot-password','reset-password']) {
+          assert.equal((await request('/api/auth/'+endpoint,{email:'deployment@example.test',password:'deployment-test-password'})).status,410);
+        }
+        assert.equal((await request('/api/course/config')).data.enabled,true);
+      } finally {delete process.env.COURSE_SSO_ENABLED;}
     } finally {server.closeAllConnections();await new Promise<void>((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}
   } finally {await db.close();}
 });

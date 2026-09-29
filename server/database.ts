@@ -78,5 +78,14 @@ export async function migrate(db: Database) {
       lease_until timestamptz NOT NULL, result jsonb, PRIMARY KEY(user_id,feature,input_hash))`);
     await tx.query(`CREATE INDEX IF NOT EXISTS ai_usage_day ON ai_usage(day,user_id,feature)`);
     await tx.query(`INSERT INTO schema_versions(version) VALUES (1),(2) ON CONFLICT DO NOTHING`);
+    await tx.query(`CREATE TABLE IF NOT EXISTS course_links (
+      subject text PRIMARY KEY, user_id text NOT NULL UNIQUE REFERENCES accounts(id),
+      linked_at timestamptz NOT NULL DEFAULT now())`);
+    await tx.query(`CREATE TABLE IF NOT EXISTS course_login_codes (
+      code_hash text PRIMARY KEY, kind text NOT NULL CHECK(kind IN ('login','setup')),
+      challenge text NOT NULL, subject text NOT NULL, email text NOT NULL,
+      expires_at timestamptz NOT NULL, session_expires_at timestamptz NOT NULL)`);
+    await tx.query(`CREATE INDEX IF NOT EXISTS course_codes_expiry ON course_login_codes(expires_at)`);
+    await tx.query(`INSERT INTO schema_versions(version) VALUES (3) ON CONFLICT DO NOTHING`);
   });
 }
