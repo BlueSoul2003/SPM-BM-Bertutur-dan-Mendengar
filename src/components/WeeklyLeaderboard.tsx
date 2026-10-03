@@ -263,7 +263,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Latih Sekarang (+50 XP)</span>
+              <span>Latih Bertutur</span>
             </button>
           </div>
         </div>
@@ -330,7 +330,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 Gred SPM
               </div>
               <div className="text-sm font-black px-2 py-0.5 rounded-lg bg-emerald-500/30 text-emerald-300 border border-emerald-400/40">
-                {userProgress.lastSpmGrade?.grade || 'A'}
+                {userProgress.lastSpmGrade?.grade || 'Belum dinilai'}
               </div>
             </div>
           </div>
@@ -512,19 +512,19 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               <span className="font-semibold text-amber-800">
                 🎙️ Ujian Bertutur SPM:
               </span>{' '}
-              +50 XP (+25 Bonus jika dapat Gred A/A+).
+              Semakan kendiri tanpa AI tidak memberikan markah atau XP.
             </div>
             <div className="p-2 rounded-xl bg-white border border-amber-100">
               <span className="font-semibold text-amber-800">
                 🗣️ Latih Sebutan & Frasa Kunci:
               </span>{' '}
-              +15 XP setiap frasa yang disebut tepat.
+              Latihan kendiri untuk memperbaiki sebutan; tiada XP diberikan.
             </div>
             <div className="p-2 rounded-xl bg-white border border-amber-100">
               <span className="font-semibold text-amber-800">
                 🎧 Ujian Mendengar SPM:
               </span>{' '}
-              +15 XP bagi setiap jawapan betul.
+              +15 XP untuk penghantaran pertama set pada hari tersebut, ditambah +10 XP bagi setiap jawapan betul. Mengulang set yang sama pada hari yang sama tidak menambah XP.
             </div>
           </div>
         </div>
