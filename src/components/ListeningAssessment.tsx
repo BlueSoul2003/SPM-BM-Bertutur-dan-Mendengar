@@ -367,6 +367,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
                   id="play-listening-audio-btn"
+                  aria-label={isPlaying ? 'Hentikan audio petikan' : 'Mainkan audio petikan'}
                   type="button"
                   onClick={handlePlayFullAudio}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md transition-all cursor-pointer active:scale-95 shrink-0 ${

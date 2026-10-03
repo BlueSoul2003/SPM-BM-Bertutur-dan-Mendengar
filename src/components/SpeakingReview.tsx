@@ -4,8 +4,19 @@ export function SpeakingReview({ topicId, title, answer, onBack, onRestart }: { 
   const [checks, setChecks] = useState<string[]>([]);
   const [showExport, setShowExport] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
   const items = ['Saya menjawab soalan yang ditanya.', 'Saya memberikan isi, huraian dan contoh.', 'Saya menyusun pendahuluan dan penutup.', 'Saya menyemak sebutan dan kelancaran dengan membaca semula.'];
   const exportText = `${title}\n\nJawapan saya:\n${answer}\n\nSemakan kendiri:\n${items.map(item => `${checks.includes(item) ? '[x]' : '[ ]'} ${item}`).join('\n')}\n\nLatihan kendiri — bukan penilaian AI atau gred rasmi.`;
+  async function copyText() {
+    setShowExport(true);
+    setCopyMessage('');
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopyMessage('Teks latihan telah disalin. Tampal ke aplikasi nota anda.');
+    } catch {
+      setCopyMessage('Salinan automatik tidak dibenarkan. Pilih teks di bawah dan salin secara manual.');
+    }
+  }
   function download() {
     let url: string | undefined;
     const link = document.createElement('a');
@@ -35,6 +46,8 @@ export function SpeakingReview({ topicId, title, answer, onBack, onRestart }: { 
     {downloadMessage && <p role="status" className="text-sm text-stone-600">{downloadMessage}</p>}
     {showExport && <div id="speaking-export" className="space-y-2">
       <label htmlFor="speaking-export-text" className="block font-bold text-sm">Teks latihan lengkap</label>
+      <button className="underline p-2 text-sm" onClick={copyText}>Salin teks latihan</button>
+      {copyMessage && <p role="status" className="text-sm text-stone-600">{copyMessage}</p>}
       <p id="speaking-export-help" className="text-sm text-stone-600">Pilih teks, salin dan tampal ke aplikasi nota anda. Jawapan dan senarai semak disertakan.</p>
       <textarea id="speaking-export-text" aria-describedby="speaking-export-help" readOnly value={exportText} onFocus={event => event.currentTarget.select()} rows={10} className="w-full rounded-xl border border-stone-300 p-3 text-sm" />
     </div>}

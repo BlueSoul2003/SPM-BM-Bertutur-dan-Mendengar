@@ -35,6 +35,7 @@ import { InteractiveText } from './InteractiveText';
 import { evaluateSpeakingResponse } from '../services/geminiService';
 import {
   getSpeechRecognition,
+  recognitionErrorMessage,
   speakMalayText,
   stopSpeaking,
   getMalaysianVoice,
@@ -137,11 +138,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
 
       recog.onerror = (event: any) => {
         isRecordingRef.current = false; setIsRecording(false);
-        if (event.error === 'not-allowed') {
-          setRecognitionError('Kebenaran mikrofon diperlukan. Sila benarkan akses mikrofon dalam pelayar anda.');
-        } else if (event.error !== 'no-speech') {
-          setRecognitionError(`Ralat pengecaman suara: ${event.error}`);
-        }
+        setRecognitionError(recognitionErrorMessage(event.error));
       };
 
       recog.onend = () => {
@@ -158,7 +155,11 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           interimTranscriptRef.current = '';
           try {
             recog.start();
-          } catch (e) {}
+          } catch {
+            isRecordingRef.current = false;
+            setIsRecording(false);
+            setRecognitionError(recognitionErrorMessage());
+          }
         } else {
           setIsRecording(false);
         }
@@ -863,7 +864,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
 
             {/* Error banner if microphone issue */}
             {recognitionError && (
-              <div className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
+              <div role="alert" className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 <span>{recognitionError}</span>
               </div>

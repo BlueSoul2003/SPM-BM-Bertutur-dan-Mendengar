@@ -1,6 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+test('unavailable or blocked recognition leaves the typing fallback usable', async () => {
+  const priorWindow = (globalThis as any).window;
+  const { getSpeechRecognition, recognitionErrorMessage } = await import('../src/utils/speechUtils.js');
+  try {
+    (globalThis as any).window = {};
+    assert.equal(getSpeechRecognition(), null);
+    (globalThis as any).window = { SpeechRecognition: class { constructor() { throw new Error('Blocked'); } } };
+    assert.equal(getSpeechRecognition(), null);
+    (globalThis as any).window = { webkitSpeechRecognition: class {} };
+    const recognition = getSpeechRecognition();
+    assert.equal(recognition.lang, 'ms-MY');
+    assert.equal(recognition.continuous, true);
+    for (const code of ['not-allowed','service-not-allowed','audio-capture','network','no-speech','language-not-supported','unknown-provider-detail']) {
+      const message = recognitionErrorMessage(code);
+      assert.match(message, /taip|menaip/);
+      assert.ok(!message.includes(code), 'show actionable text, not provider error codes');
+    }
+  } finally { (globalThis as any).window = priorWindow; }
+});
+
 test('device speech completes, reports failures, and ignores cancelled callbacks without a cloud request', async () => {
   let utterance: any; let requests = 0;
   const priorWindow = (globalThis as any).window, priorUtterance = (globalThis as any).SpeechSynthesisUtterance;

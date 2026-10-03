@@ -8,6 +8,24 @@ export interface SpeechRecognitionResultState {
   error?: string;
 }
 
+export function recognitionErrorMessage(code?: string): string {
+  switch (code) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      return 'Akses mikrofon atau pengecaman suara tidak dibenarkan. Semak kebenaran pelayar, atau taip jawapan anda.';
+    case 'audio-capture':
+      return 'Mikrofon tidak dapat dikesan. Semak sambungan mikrofon, atau taip jawapan anda.';
+    case 'network':
+      return 'Sambungan pengecaman suara terganggu. Semak internet dan cuba lagi, atau teruskan dengan menaip.';
+    case 'no-speech':
+      return 'Tiada suara dikesan. Tekan mikrofon untuk mencuba lagi, atau taip jawapan anda.';
+    case 'language-not-supported':
+      return 'Pengecaman Bahasa Melayu tidak tersedia dalam pelayar ini. Anda masih boleh menaip jawapan.';
+    default:
+      return 'Pengecaman suara telah berhenti. Cuba lagi atau taip jawapan anda. Jawapan yang sudah dipaparkan dikekalkan.';
+  }
+}
+
 // Global reference to active audio player
 let currentAudioPlayer: HTMLAudioElement | null = null;
 let currentAbortController: AbortController | null = null;
@@ -49,12 +67,15 @@ export function getSpeechRecognition(): any {
     (window as any).webkitSpeechRecognition;
   if (!SpeechRecognition) return null;
 
-  const recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  // Malay locale for Malaysian SPM phoneme recognition
-  recognition.lang = 'ms-MY';
-  return recognition;
+  try {
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'ms-MY';
+    return recognition;
+  } catch {
+    return null;
+  }
 }
 
 // Cached voice list for offline fallback
