@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import { getStoredAuthUser } from '../services/authService';
 import { SpeakingReview } from './SpeakingReview';
 import { useCapabilities } from '../services/capabilities';
@@ -52,6 +53,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
   onWordClick,
   onEarnPoints,
 }) => {
+  const { t } = useTranslation();
   const capabilities = useCapabilities();
   const draftKey = `bual-speaking-draft:${getStoredAuthUser()?.id || 'guest'}`;
   const [draft] = useState(() => { try { return JSON.parse(sessionStorage.getItem(draftKey) || 'null'); } catch { return null; } });
@@ -429,15 +431,15 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           </div>
           <div className="leading-tight truncate">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-black text-slate-900">Ujian Bertutur SPM</span>
+              <span className="text-xs font-black text-slate-900">{t("Ujian Bertutur SPM")}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-800 font-bold">1103/3</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-900 font-bold">40 Markah</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-900 font-bold">{t("40 Markah")}</span>
             </div>
             {/* Malaysian speaker voice indicator badge */}
             <div className="flex items-center gap-1 text-[10px] text-slate-500 truncate">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
               <span className="truncate" title={voiceDetails.name}>
-                {voiceDetails.isExplicitlyMalaysian ? 'Suara Melayu peranti' : 'Suara lalai peranti'}
+                {voiceDetails.isExplicitlyMalaysian ? t("Suara Melayu peranti") : t("Suara lalai peranti")}
               </span>
             </div>
           </div>
@@ -456,9 +458,8 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             }}
             className="text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 px-2 py-1.5 rounded-xl border border-slate-300 outline-none max-w-[170px] truncate cursor-pointer"
           >
-            {SPM_SPEAKING_TOPICS.map((t, idx) => (
-              <option key={t.id} value={t.id}>
-                Set {idx + 1}: {t.title}
+            {SPM_SPEAKING_TOPICS.map((topic, idx) => (
+              <option lang="ms" key={topic.id} value={topic.id}> {t("Set")} {idx + 1}: {topic.title}
               </option>
             ))}
           </select>
@@ -467,7 +468,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             type="button"
             onClick={() => setShowScaleModal(true)}
             className="p-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 cursor-pointer"
-            title="Skala Gred Rasmi SPM 1103/3"
+            title={t("Skala Gred Rasmi SPM 1103/3")}
           >
             <BarChart3 className="w-3.5 h-3.5" />
           </button>
@@ -485,15 +486,11 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center">
                 1
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                Halaman 1: Mula & Soalan Tugasan
-              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-800"> {t("Halaman 1: Mula & Soalan Tugasan")} </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-bold text-slate-400">Langkah 1 daripada 3</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">
-                Format Rasmi SPM
-              </span>
+              <span className="text-[10px] font-bold text-slate-400">{t("Langkah 1 daripada 3")}</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-300"> {t("Format Rasmi SPM")} </span>
             </div>
           </div>
 
@@ -501,10 +498,9 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           <div className="practice-stimulus rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm border border-emerald-900/50">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">
-                {selectedTopic.type === 'individu' ? 'Bahagian A: Ujian Individu (40 Markah)' : 'Bahagian B: Ujian Kumpulan (40 Markah)'}
+                {selectedTopic.type === 'individu' ? t("Bahagian A: Ujian Individu (40 Markah)") : t("Bahagian B: Ujian Kumpulan (40 Markah)")}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-amber-300 font-semibold">
-                Tema: {selectedTopic.theme}
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-amber-300 font-semibold"> {t("Tema:")} {selectedTopic.theme}
               </span>
             </div>
 
@@ -518,12 +514,8 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             <div className="bg-white/10 rounded-xl p-3 border border-white/10 space-y-1.5">
               <div className="flex items-center justify-between flex-wrap gap-1">
                 <span className="text-[11px] font-black uppercase text-amber-300 flex items-center gap-1">
-                  <Target className="w-3.5 h-3.5 text-amber-400" />
-                  Soalan Pentaksir SPM:
-                </span>
-                <span className="text-[10px] text-amber-200/80">
-                  💡 Ketik perkataan untuk maksud kamus
-                </span>
+                  <Target className="w-3.5 h-3.5 text-amber-400" /> {t("Soalan Pentaksir SPM:")} </span>
+                <span className="text-[10px] text-amber-200/80"> {t("💡 Ketik perkataan untuk maksud kamus")} </span>
               </div>
               <div className="text-xs sm:text-sm text-slate-100 font-medium leading-relaxed">
                 "<InteractiveText text={primaryQuestion} onWordClick={onWordClick} />"
@@ -532,7 +524,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
 
             {/* Aspek Bimbingan Calon */}
             <div className="space-y-1 pt-1">
-              <span className="text-[10px] font-bold text-slate-300">Aspek Pertuturan Calon:</span>
+              <span className="text-[10px] font-bold text-slate-300">{t("Aspek Pertuturan Calon:")}</span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {(selectedTopic.guideQuestions || []).slice(0, 2).map((q, idx) => (
                   <div key={idx} className="text-[11px] text-emerald-100 bg-white/5 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
@@ -549,16 +541,14 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           {/* Process Walkthrough Info Pills */}
           <div className="grid grid-cols-2 gap-2 text-center text-xs">
             <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900">
-              <span className="text-[10px] uppercase font-bold text-amber-700 block">Halaman 2</span>
+              <span className="text-[10px] uppercase font-bold text-amber-700 block">{t("Halaman 2")}</span>
               <span className="font-bold flex items-center justify-center gap-1 mt-0.5">
-                <Clock className="w-3.5 h-3.5 text-amber-600" /> 1 Minit Persediaan
-              </span>
+                <Clock className="w-3.5 h-3.5 text-amber-600" /> {t("1 Minit Persediaan")} </span>
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-900">
-              <span className="text-[10px] uppercase font-bold text-emerald-700 block">Halaman 3</span>
+              <span className="text-[10px] uppercase font-bold text-emerald-700 block">{t("Halaman 3")}</span>
               <span className="font-bold flex items-center justify-center gap-1 mt-0.5">
-                <Headphones className="w-3.5 h-3.5 text-emerald-600" /> Soalan Audio & Butang Mic
-              </span>
+                <Headphones className="w-3.5 h-3.5 text-emerald-600" /> {t("Soalan Audio & Butang Mic")} </span>
             </div>
           </div>
 
@@ -571,12 +561,10 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               className="practice-start w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-emerald-700/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>Mula Ujian Bertutur SPM</span>
+              <span>{t("Mula Ujian Bertutur SPM")}</span>
               <ChevronRight className="w-4 h-4" />
             </button>
-            <p className="text-[10px] text-center text-slate-400 mt-2">
-              Ketik untuk memulakan masa persediaan bahan rangsangan secara automatik.
-            </p>
+            <p className="text-[10px] text-center text-slate-400 mt-2"> {t("Ketik untuk memulakan masa persediaan bahan rangsangan secara automatik.")} </p>
           </div>
         </div>
       )}
@@ -592,11 +580,9 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               <span className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 text-xs font-black flex items-center justify-center">
                 2
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
-                Halaman 2: Bahan Rangsangan (Masa Persediaan)
-              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-900"> {t("Halaman 2: Bahan Rangsangan (Masa Persediaan)")} </span>
             </div>
-            <span className="text-[10px] font-bold text-slate-400">Langkah 2 daripada 3</span>
+            <span className="text-[10px] font-bold text-slate-400">{t("Langkah 2 daripada 3")}</span>
           </div>
 
           {/* COUNTDOWN TIMER BANNER */}
@@ -607,8 +593,8 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-800 block">Masa Persediaan SPM</span>
-                  <span className="text-xs font-bold text-slate-800">Teliti isi kandungan petikan rangsangan</span>
+                  <span className="text-[10px] uppercase font-bold text-amber-800 block">{t("Masa Persediaan SPM")}</span>
+                  <span className="text-xs font-bold text-slate-800">{t("Teliti isi kandungan petikan rangsangan")}</span>
                 </div>
               </div>
 
@@ -627,18 +613,14 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 style={{ width: `${Math.max(0, (prepTimeLeft / (selectedTopic.prepTimeSeconds || 60)) * 100)}%` }}
               />
             </div>
-            <p className="text-[10px] text-amber-800 font-medium text-center">
-              ⏳ Apabila masa tamat, halaman akan bertukar ke soalan pentaksir secara automatik.
-            </p>
+            <p className="text-[10px] text-amber-800 font-medium text-center"> {t("⏳ Apabila masa tamat, halaman akan bertukar ke soalan pentaksir secara automatik.")} </p>
           </div>
 
           {/* STIMULUS DISPLAY (Compact height, readable, interactive words) */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 sm:p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase text-slate-800 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-emerald-700" />
-                Petikan Bahan Rangsangan:
-              </span>
+                <FileText className="w-3.5 h-3.5 text-emerald-700" /> {t("Petikan Bahan Rangsangan:")} </span>
 
               {/* Audio button for stimulus (Malaysian speaker) */}
               <button
@@ -651,7 +633,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 ) : (
                   <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
                 )}
-                <span>{isPlayingAudio && audioPlayingText === selectedTopic.stimulusText ? 'Henti' : 'Dengar Petikan'}</span>
+                <span>{isPlayingAudio && audioPlayingText === selectedTopic.stimulusText ? 'Henti' : t("Dengar Petikan")}</span>
               </button>
             </div>
 
@@ -662,9 +644,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 onWordClick={onWordClick}
               />
             </div>
-            <span className="text-[10px] text-slate-400 block text-right">
-              💡 Ketik mana-mana perkataan sukar untuk takrifan kamus
-            </span>
+            <span className="text-[10px] text-slate-400 block text-right"> {t("💡 Ketik mana-mana perkataan sukar untuk takrifan kamus")} </span>
           </div>
 
           {/* SKIP / PROCEED EARLY BUTTON */}
@@ -674,7 +654,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               onClick={handleAutoProceedToPage3}
               className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-[0.98]"
             >
-              <span>Saya Sudah Sedia (Terus Menjawab)</span>
+              <span>{t("Saya Sudah Sedia (Terus Menjawab)")}</span>
               <ChevronRight className="w-4 h-4 text-emerald-400" />
             </button>
           </div>
@@ -692,9 +672,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               <span className="w-6 h-6 rounded-full bg-emerald-600 text-white text-xs font-black flex items-center justify-center">
                 3
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-900">
-                Halaman 3: Soalan Audio & Menjawab
-              </span>
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-900"> {t("Halaman 3: Soalan Audio & Menjawab")} </span>
             </div>
             {/* Answer countdown */}
             <div className="flex items-center gap-1 text-xs font-mono font-bold bg-slate-100 px-2 py-0.5 rounded-lg text-slate-700">
@@ -715,12 +693,8 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                   <Volume2 className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-400 block">
-                    Audio Soalan Pentaksir
-                  </span>
-                  <span className="text-xs font-semibold text-slate-200">
-                    Penyampai: Bahasa Melayu (Malaysia)
-                  </span>
+                  <span className="text-[10px] uppercase font-bold text-amber-400 block"> {t("Audio Soalan Pentaksir")} </span>
+                  <span className="text-xs font-semibold text-slate-200"> {t("Penyampai: Bahasa Melayu (Malaysia)")} </span>
                 </div>
               </div>
 
@@ -733,12 +707,12 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 {isPlayingAudio && audioPlayingText === `Soalan Pentaksir SPM: ${primaryQuestion}` ? (
                   <>
                     <VolumeX className="w-3.5 h-3.5 text-red-400" />
-                    <span>Henti Audio</span>
+                    <span>{t("Henti Audio")}</span>
                   </>
                 ) : (
                   <>
                     <Play className="w-3.5 h-3.5 text-emerald-400 fill-current" />
-                    <span>Dengar Soalan</span>
+                    <span>{t("Dengar Soalan")}</span>
                   </>
                 )}
               </button>
@@ -751,9 +725,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 <span className="w-1 h-5 bg-amber-400 rounded-full animate-pulse delay-75" />
                 <span className="w-1 h-7 bg-emerald-400 rounded-full animate-pulse delay-150" />
                 <span className="w-1 h-4 bg-teal-400 rounded-full animate-pulse delay-100" />
-                <span className="text-[10px] font-semibold ml-2 text-slate-300">
-                  Pentaksir sedang memperdengarkan soalan...
-                </span>
+                <span className="text-[10px] font-semibold ml-2 text-slate-300"> {t("Pentaksir sedang memperdengarkan soalan...")} </span>
               </div>
             )}
           </div>
@@ -773,30 +745,26 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 )}
                 <span>
                   {showQuestionText
-                    ? 'Sembunyi Teks Soalan'
-                    : 'Tunjuk Teks Soalan (Rujukan jika sukar faham audio)'}
+                    ? t("Sembunyi Teks Soalan")
+                    : t("Tunjuk Teks Soalan (Rujukan jika sukar faham audio)")}
                 </span>
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-600 font-semibold">
-                {showQuestionText ? 'Tutup' : 'Klik untuk Buka'}
+                {showQuestionText ? t("Tutup") : t("Klik untuk Buka")}
               </span>
             </button>
 
             {showQuestionText && (
               <div className="p-3 bg-white border-t border-slate-200 text-xs space-y-1.5 animate-in slide-in-from-top-2">
                 <div className="flex items-center justify-between flex-wrap gap-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-500">
-                    Teks Soalan:
-                  </span>
-                  <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                    💡 Ketik perkataan untuk maksud kamus
-                  </span>
+                  <span className="text-[10px] uppercase font-bold text-slate-500"> {t("Teks Soalan:")} </span>
+                  <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded"> {t("💡 Ketik perkataan untuk maksud kamus")} </span>
                 </div>
                 <div className="font-semibold text-slate-900 font-serif leading-relaxed">
                   "<InteractiveText text={primaryQuestion} onWordClick={onWordClick} />"
                 </div>
                 <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 space-y-0.5">
-                  <span className="font-bold text-slate-700">Panduan Aspek Pertuturan:</span>
+                  <span className="font-bold text-slate-700">{t("Panduan Aspek Pertuturan:")}</span>
                   <ul className="list-disc list-inside space-y-0.5">
                     {(selectedTopic.guideQuestions || []).map((g, idx) => (
                       <li key={idx}>
@@ -813,11 +781,8 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Mic className="w-3.5 h-3.5 text-emerald-600" />
-                Ketik Mic untuk Menjawab:
-              </span>
-              <span className="text-[11px] text-slate-500">
-                Patah Perkataan: {spokenTranscript.trim() ? spokenTranscript.trim().split(/\s+/).length : 0}
+                <Mic className="w-3.5 h-3.5 text-emerald-600" /> {t("Ketik Mic untuk Menjawab:")} </span>
+              <span className="text-[11px] text-slate-500"> {t("Patah Perkataan:")} {spokenTranscript.trim() ? spokenTranscript.trim().split(/\s+/).length : 0}
               </span>
             </div>
 
@@ -835,12 +800,12 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 {isRecording ? (
                   <>
                     <MicOff className="w-4 h-4" />
-                    <span>Sedang Merakam... (Ketik untuk Selesai)</span>
+                    <span>{t("Sedang Merakam... (Ketik untuk Selesai)")}</span>
                   </>
                 ) : (
                   <>
                     <Mic className="w-4 h-4" />
-                    <span>{spokenTranscript ? 'Sambung Rakam Jawapan' : 'Mula Rakam Jawapan'}</span>
+                    <span>{spokenTranscript ? t("Sambung Rakam Jawapan") : t("Mula Rakam Jawapan")}</span>
                   </>
                 )}
               </button>
@@ -855,7 +820,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                     interimTranscriptRef.current = '';
                   }}
                   className="p-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold cursor-pointer"
-                  title="Padam Transkrip"
+                  title={t("Padam Transkrip")}
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
@@ -866,14 +831,14 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             {recognitionError && (
               <div role="alert" className="p-2 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-center gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span>{recognitionError}</span>
+                <span>{t(recognitionError)}</span>
               </div>
             )}
 
-<p className="text-xs text-stone-500">Pengecaman suara mungkin diproses oleh penyedia pelayar anda. Anda boleh menaip jawapan tanpa menggunakan mikrofon.</p>
+<p className="text-xs text-stone-500">{t("Pengecaman suara mungkin diproses oleh penyedia pelayar anda. Anda boleh menaip jawapan tanpa menggunakan mikrofon.")}</p>
             {/* Real-time transcript textarea */}
-            <textarea
-              aria-label="Jawapan pertuturan"
+            <textarea lang="ms"
+              aria-label={t("Jawapan pertuturan")}
               maxLength={5000}
               readOnly={isRecording}
               value={spokenTranscript}
@@ -881,7 +846,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 setSpokenTranscript(e.target.value);
                 baseTranscriptRef.current = e.target.value;
               }}
-              placeholder="Jawapan lisan anda akan muncul secara langsung di sini apabila bercakap ke dalam mikrofon (atau taip di sini)..."
+              placeholder={t("Jawapan lisan anda akan muncul secara langsung di sini apabila bercakap ke dalam mikrofon (atau taip di sini)...")}
               className="w-full h-24 sm:h-28 p-2.5 bg-slate-50 border border-slate-300 rounded-2xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none leading-relaxed"
             />
           </div>
@@ -899,7 +864,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               }`}
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>{capabilities.ai ? 'Hantar untuk penilaian AI' : 'Selesai & semak sendiri'}</span>
+              <span>{capabilities.ai ? t("Hantar untuk penilaian AI") : t("Selesai & semak sendiri")}</span>
             </button>
           </div>
         </div>
@@ -936,7 +901,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 Keputusan Latihan 1103/3
               </span>
               <h3 className="text-base sm:text-lg font-bold font-serif text-white">
-                {calculatedGrade.label}
+                {t(calculatedGrade.label)}
               </h3>
               <p className="text-[11px] text-emerald-200 max-w-md line-clamp-2">
                 {evaluationResult.examinerSummary}
@@ -944,7 +909,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
             </div>
 
             <div className="text-center bg-white/10 px-4 py-2.5 rounded-2xl border border-white/20 shrink-0">
-              <span className="text-[9px] uppercase font-bold text-amber-300 block">Gred SPM</span>
+              <span className="text-[9px] uppercase font-bold text-amber-300 block">{t("Gred SPM")}</span>
               <div className="text-2xl sm:text-3xl font-black text-amber-400">{calculatedGrade.grade}</div>
               <span className="text-[10px] text-white font-mono font-bold">{evaluationResult.totalScore}/40m</span>
             </div>
@@ -1010,7 +975,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                 {isPlayingAudio && audioPlayingText === evaluationResult.exemplarAnswer ? (
                   <>
                     <VolumeX className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Henti Audio</span>
+                    <span>{t("Henti Audio")}</span>
                   </>
                 ) : (
                   <>
@@ -1197,7 +1162,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
                       {scale.grade}
                     </span>
                     <div>
-                      <span className="font-bold text-slate-900 block leading-tight">{scale.label}</span>
+                      <span className="font-bold text-slate-900 block leading-tight">{t(scale.label)}</span>
                       <span className="text-[10px] text-slate-500">{scale.tpLevel}</span>
                     </div>
                   </div>
@@ -1212,9 +1177,7 @@ export const SpeakingAssessment: React.FC<SpeakingAssessmentProps> = ({
               type="button"
               onClick={() => setShowScaleModal(false)}
               className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl cursor-pointer"
-            >
-              Tutup
-            </button>
+            > {t("Tutup")} </button>
           </div>
         </div>
       )}

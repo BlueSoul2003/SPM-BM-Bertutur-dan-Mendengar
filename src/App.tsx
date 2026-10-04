@@ -1,3 +1,4 @@
+import { useTranslation } from './i18n/LanguageProvider';
 import { PracticeHistory } from './components/PracticeHistory';
 import { useCapabilities } from './services/capabilities';
 import { RecoveryView } from './components/RecoveryView';
@@ -40,6 +41,7 @@ const WORD_BANK_STORAGE_KEY = 'spm_bm_word_bank_v1';
 const PREF_LANG_STORAGE_KEY = 'spm_bm_pref_lang_v1';
 
 export default function App() {
+  const { t } = useTranslation();
   const capabilities = useCapabilities();
   const [sessionLoading, setSessionLoading] = useState(true);
   const [resetToken,setResetToken]=useState(()=>new URLSearchParams(window.location.search).get('reset')||'');
@@ -260,7 +262,7 @@ export default function App() {
     setUserProgress(loadUserProgress());
     setPointsToast({
       points: rewardXp,
-      reason: `Daftar Masuk Harian (Rentetan ${newStreak} Hari Berturut-turut! 🔥)`
+      reason: 'Daftar Masuk Harian'
     });
     setTimeout(() => {
       setPointsToast(null);
@@ -326,7 +328,7 @@ export default function App() {
 
   return (
     <div className="bm-app min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900 selection:bg-amber-100 selection:text-amber-900">
-      <div className="bg-[#f6e7ec] text-[#713047] px-4 py-2 text-center text-xs leading-relaxed">Versi percubaan · Akaun, latihan mendengar dan kemajuan tersedia. Penilaian AI belum dibuka.</div>
+      <div className="bg-[#f6e7ec] text-[#713047] px-4 py-2 text-center text-xs leading-relaxed">{t("Versi percubaan · Akaun, latihan mendengar dan kemajuan tersedia. Penilaian AI belum dibuka.")}</div>
       {/* Top Navbar (Only shown after login/registration) */}
       {userProgress.isRegistered && (
         <Navbar
@@ -354,16 +356,15 @@ export default function App() {
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-black text-amber-400 tracking-wide">
-                  {pointsToast.points > 0 ? `+${pointsToast.points} XP Diperoleh!` : 'Makluman'}
+                  {pointsToast.points > 0 ? t('+{points} XP Diperoleh!', { points: pointsToast.points }) : t('Makluman')}
                 </span>
                 {pointsToast.spmGrade && (
-                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black">
-                    Gred {pointsToast.spmGrade.grade}
+                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black"> {t("Gred")} {pointsToast.spmGrade.grade}
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-200 line-clamp-2 leading-tight">
-                {pointsToast.reason}
+                {t(pointsToast.reason)}
               </p>
             </div>
           </div>
@@ -378,14 +379,14 @@ export default function App() {
 
       {/* Main Content View (Mandatory registration gate enforced) */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 pb-24 lg:pb-8">
-        {sessionLoading ? <div className="loading-card" role="status">Menyediakan akaun anda…</div> : !userProgress.isRegistered ? (
+        {sessionLoading ? <div className="loading-card" role="status">{t("Menyediakan akaun anda…")}</div> : !userProgress.isRegistered ? (
           <AuthGateView
             onRecover={()=>setIsRecovering(true)}
             currentUserProgress={userProgress}
             onAuthSuccess={handleAuthSuccess}
           />
         ) : (
-          <Suspense fallback={<div className="loading-card" role="status">Menyediakan ruang belajar...</div>}>
+          <Suspense fallback={<div className="loading-card" role="status">{t("Menyediakan ruang belajar...")}</div>}>
             <SubscriptionStatus/>
             <PracticeHistory key={userProgress.userId}/>
             <LearningGreeting activeTab={activeTab}/>
@@ -407,7 +408,7 @@ export default function App() {
               capabilities.ai ? <AiTutorChat
                 onWordClick={handleWordClick}
                 onEarnPoints={handleEarnPoints}
-              /> : <section className="welcome-account space-y-4"><h2 className="text-xl font-bold">Cikgu AI belum dibuka</h2><p>Anda masih boleh berlatih bertutur, membaca contoh jawapan dan menyemak kefahaman mendengar secara percuma.</p><button className="practice-start rounded-xl p-3 text-white" onClick={() => setActiveTab('speaking')}>Mula latihan kendiri</button></section>
+              /> : <section className="welcome-account space-y-4"><h2 className="text-xl font-bold">{t("Cikgu AI belum dibuka")}</h2><p>{t("Anda masih boleh berlatih bertutur, membaca contoh jawapan dan menyemak kefahaman mendengar secara percuma.")}</p><button className="practice-start rounded-xl p-3 text-white" onClick={() => setActiveTab('speaking')}>{t("Mula latihan kendiri")}</button></section>
             )}
 
             {activeTab === 'leaderboard' && (

@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Trophy,
@@ -65,6 +66,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
   onOpenAuthModal,
   onLogout,
 }) => {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<'weekly' | 'alltime'>('weekly');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [nameInput, setNameInput] = useState(userProgress.studentName || 'Saya (Calon SPM)');
@@ -137,27 +139,19 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
     switch (league) {
       case 'diamond':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
-            💎 Liga Berlian
-          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200"> {t("💎 Liga Berlian")} </span>
         );
       case 'gold':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            🥇 Liga Emas
-          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200"> {t("🥇 Liga Emas")} </span>
         );
       case 'silver':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300">
-            🥈 Liga Perak
-          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700 border border-slate-300"> {t("🥈 Liga Perak")} </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200">
-            🥉 Liga Gangsa
-          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200"> {t("🥉 Liga Gangsa")} </span>
         );
     }
   };
@@ -198,14 +192,12 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
         <div className="p-3 bg-emerald-900/90 text-emerald-100 border border-emerald-500/50 rounded-2xl text-xs flex items-center justify-between shadow-lg animate-in fade-in">
           <div className="flex items-center gap-2 font-semibold">
             <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>{statusMessage}</span>
+            <span>{t(statusMessage)}</span>
           </div>
           <button
             onClick={() => setStatusMessage(null)}
             className="text-emerald-300 hover:text-white text-xs underline"
-          >
-            Tutup
-          </button>
+          > {t("Tutup")} </button>
         </div>
       )}
 
@@ -218,24 +210,14 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="px-2.5 py-1 rounded-full bg-amber-400/20 text-amber-300 text-xs font-bold tracking-wide flex items-center gap-1.5 border border-amber-400/30">
-                <Trophy className="w-3.5 h-3.5" />
-                PAPAN PENDAHULU · JUMLAH XP
-              </span>
+                <Trophy className="w-3.5 h-3.5" /> {t("PAPAN PENDAHULU · JUMLAH XP")} </span>
               <span className="text-xs text-indigo-200 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-indigo-300" />
-                Jumlah terkumpul · tiada reset mingguan
-              </span>
+                <Clock className="w-3.5 h-3.5 text-indigo-300" /> {t("Jumlah terkumpul · tiada reset mingguan")} </span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                Pengguna Sebenar Sahaja
-              </span>
+                <ShieldCheck className="w-3 h-3 text-emerald-400" /> {t("Pengguna Sebenar Sahaja")} </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Papan Pendahulu Murid SPM
-            </h1>
-            <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-lg leading-relaxed">
-              Tiada data tiruan atau akaun bot sistem. Bersaing secara sihat bersama calon SPM sebenar yang memulakan persediaan dari Hari 1!
-            </p>
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white"> {t("Papan Pendahulu Murid SPM")} </h1>
+            <p className="text-xs sm:text-sm text-indigo-200 mt-1 max-w-lg leading-relaxed"> {t("Tiada data tiruan atau akaun bot sistem. Bersaing secara sihat bersama calon SPM sebenar yang memulakan persediaan dari Hari 1!")} </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -244,10 +226,10 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               onClick={loadLeaderboardData}
               disabled={isLoading}
               className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-100 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-              title="Kemas kini senarai pengguna sebenar"
+              title={t("Kemas kini senarai pengguna sebenar")}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{isLoading ? 'Memuatkan...' : 'Segar Semula'}</span>
+              <span>{isLoading ? 'Memuatkan...' : t("Segar Semula")}</span>
             </button>
             <button
               id="how-points-work-btn"
@@ -255,7 +237,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-100 text-xs font-semibold flex items-center gap-1.5 transition-colors"
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>Cara Kumpul Mata</span>
+              <span>{t("Cara Kumpul Mata")}</span>
             </button>
             <button
               id="cta-battle-speaking"
@@ -263,7 +245,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/30 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Latih Bertutur</span>
+              <span>{t("Latih Bertutur")}</span>
             </button>
           </div>
         </div>
@@ -282,17 +264,15 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 <button
                   onClick={() => setIsEditingProfile(!isEditingProfile)}
                   className="text-xs text-indigo-300 hover:text-white underline flex items-center gap-0.5 cursor-pointer"
-                  title="Tukar Nama & Sekolah"
+                  title={t("Tukar Nama & Sekolah")}
                 >
-                  <Edit2 className="w-3 h-3" />
-                  Ubah
-                </button>
+                  <Edit2 className="w-3 h-3" /> {t("Ubah")} </button>
               </div>
               <div className="text-xs text-indigo-200">
                 {userProgress.schoolName ? `${userProgress.schoolName} • ` : ''}
-                {userProgress.state || 'Malaysia'} • Aras:{' '}
+                {userProgress.state || 'Malaysia'} {t("• Aras:")}{' '}
                 <span className="text-amber-300 font-semibold">
-                  {userProgress.levelName}
+                  {t(userProgress.levelName)}
                 </span>
               </div>
             </div>
@@ -300,37 +280,29 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
 
           <div className="flex items-center gap-3 sm:gap-6 justify-between sm:justify-end border-t sm:border-t-0 border-white/10 pt-2 sm:pt-0">
             <div className="text-center">
-              <div className="text-[10px] uppercase font-bold text-indigo-300">
-                Kedudukan
-              </div>
+              <div className="text-[10px] uppercase font-bold text-indigo-300"> {t("Kedudukan")} </div>
               <div className="text-lg font-black text-amber-400">
                 {serverEntries.some(entry => entry.id === userProgress.userId) ? `#${currentUserRank}` : '—'}
               </div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] uppercase font-bold text-indigo-300">
-                Jumlah Mata
-              </div>
+              <div className="text-[10px] uppercase font-bold text-indigo-300"> {t("Jumlah Mata")} </div>
               <div className="text-lg font-black text-white">
                 {userProgress.points}{' '}
                 <span className="text-xs text-amber-300 font-normal">XP</span>
               </div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] uppercase font-bold text-indigo-300">
-                Rentak
-              </div>
+              <div className="text-[10px] uppercase font-bold text-indigo-300"> {t("Rentak")} </div>
               <div className="text-lg font-black text-orange-400 flex items-center justify-center gap-0.5">
                 <Flame className="w-4 h-4 fill-orange-400" />
-                {userProgress.streak}h
+                {userProgress.streak} {t('hari')}
               </div>
             </div>
             <div className="text-center">
-              <div className="text-[10px] uppercase font-bold text-indigo-300">
-                Gred SPM
-              </div>
+              <div className="text-[10px] uppercase font-bold text-indigo-300"> {t("Gred SPM")} </div>
               <div className="text-sm font-black px-2 py-0.5 rounded-lg bg-emerald-500/30 text-emerald-300 border border-emerald-400/40">
-                {userProgress.lastSpmGrade?.grade || 'Belum dinilai'}
+                {userProgress.lastSpmGrade?.grade || t("Belum dinilai")}
               </div>
             </div>
           </div>
@@ -385,15 +357,11 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
               </div>
               <div className="text-xs">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-white">Akaun Calon SPM Berdaftar:</span>
-                  <span className="font-bold text-emerald-300">{userProgress.studentName || 'Calon SPM'}</span>
-                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold">
-                    ✓ Disahkan
-                  </span>
+                  <span className="font-bold text-white">{t("Akaun Calon SPM Berdaftar:")}</span>
+                  <span className="font-bold text-emerald-300">{userProgress.studentName || t("Calon SPM")}</span>
+                  <span className="px-1.5 py-0.2 rounded-md bg-emerald-400/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-bold"> {t("✓ Disahkan")} </span>
                 </div>
-                <div className="text-emerald-200/80 text-[11px] mt-0.5">
-                  Kedudukan {serverEntries.some(entry => entry.id === userProgress.userId) ? `#${currentUserRank}` : '—'} dan rekod {userProgress.points} XP anda disimpan dengan selamat dalam pangkalan data pelayan.
-                </div>
+                <div className="text-emerald-200/80 text-[11px] mt-0.5"> {t("Kedudukan")} {serverEntries.some(entry => entry.id === userProgress.userId) ? `#${currentUserRank}` : '—'} {t("dan rekod")} {userProgress.points} {t("XP anda disimpan dengan selamat dalam pangkalan data pelayan.")} </div>
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -401,16 +369,14 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 type="button"
                 onClick={() => onOpenAuthModal('login')}
                 className="text-[11px] text-emerald-300 hover:text-white underline cursor-pointer"
-              >
-                Tukar Akaun
-              </button>
+              > {t("Tukar Akaun")} </button>
               <button
                 type="button"
                 onClick={onLogout}
                 className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-rose-500/20 hover:text-rose-200 text-xs text-white/80 border border-white/10 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <LogOut className="w-3 h-3" />
-                <span>Log Keluar</span>
+                <span>{t("Log Keluar")}</span>
               </button>
             </div>
           </div>
@@ -420,16 +386,12 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
         {isEditingProfile && (
           <div className="mt-3 p-3.5 bg-slate-800/95 rounded-2xl border border-indigo-500/30 text-xs space-y-3">
             <div className="font-semibold text-indigo-200 flex items-center justify-between">
-              <span>Peribadikan Profil Papan Pendahulu Calon SPM:</span>
-              <span className="text-[11px] text-slate-400">
-                Maklumat ini akan dipaparkan kepada calon lain
-              </span>
+              <span>{t("Peribadikan Profil Papan Pendahulu Calon SPM:")}</span>
+              <span className="text-[11px] text-slate-400"> {t("Maklumat ini akan dipaparkan kepada calon lain")} </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="text-[11px] text-slate-300 block mb-1">
-                  Nama Anda / Samaran:
-                </label>
+                <label className="text-[11px] text-slate-300 block mb-1"> {t("Nama Anda / Samaran:")} </label>
                 <input
                   type="text"
                   value={nameInput}
@@ -440,9 +402,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-300 block mb-1">
-                  Nama Sekolah:
-                </label>
+                <label className="text-[11px] text-slate-300 block mb-1"> {t("Nama Sekolah:")} </label>
                 <input
                   type="text"
                   value={schoolInput}
@@ -453,9 +413,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-300 block mb-1">
-                  Negeri:
-                </label>
+                <label className="text-[11px] text-slate-300 block mb-1"> {t("Negeri:")} </label>
                 <select
                   value={stateInput}
                   onChange={(e) => setStateInput(e.target.value)}
@@ -478,16 +436,13 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                   type="button"
                   onClick={() => setIsEditingProfile(false)}
                   className="px-3 py-1.5 rounded-xl text-slate-300 hover:text-white"
-                >
-                  Batal
-                </button>
+                > {t("Batal")} </button>
                 <button
                   type="button"
                   onClick={handleSaveProfile}
                   className="px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold flex items-center gap-1 cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5" /> Simpan Profil
-                </button>
+                  <Check className="w-3.5 h-3.5" /> {t("Simpan Profil")} </button>
               </div>
             </div>
           </div>
@@ -498,34 +453,16 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
       {showHowPointsWork && (
         <div className="p-4 rounded-3xl bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2 animate-in fade-in">
           <div className="font-bold text-sm flex items-center gap-1.5 text-amber-900">
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            Sistem Pemarkahan & Ganjaran XP SPM:
-          </div>
+            <Sparkles className="w-4 h-4 text-amber-600" /> {t("Sistem Pemarkahan & Ganjaran XP SPM:")} </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-700">
             <div className="p-2 rounded-xl bg-white border border-amber-100">
-              <span className="font-semibold text-amber-800">
-                🎁 Daftar Masuk Harian:
-              </span>{' '}
-              +20 hingga +120 XP (Hari 7 dapat mahkota + hadiah khas).
-            </div>
+              <span className="font-semibold text-amber-800"> {t("🎁 Daftar Masuk Harian:")} </span>{' '} {t("+20 hingga +120 XP (Hari 7 dapat mahkota + hadiah khas).")} </div>
             <div className="p-2 rounded-xl bg-white border border-amber-100">
-              <span className="font-semibold text-amber-800">
-                🎙️ Ujian Bertutur SPM:
-              </span>{' '}
-              Semakan kendiri tanpa AI tidak memberikan markah atau XP.
-            </div>
+              <span className="font-semibold text-amber-800"> {t("🎙️ Ujian Bertutur SPM:")} </span>{' '} {t("Semakan kendiri tanpa AI tidak memberikan markah atau XP.")} </div>
             <div className="p-2 rounded-xl bg-white border border-amber-100">
-              <span className="font-semibold text-amber-800">
-                🗣️ Latih Sebutan & Frasa Kunci:
-              </span>{' '}
-              Latihan kendiri untuk memperbaiki sebutan; tiada XP diberikan.
-            </div>
+              <span className="font-semibold text-amber-800"> {t("🗣️ Latih Sebutan & Frasa Kunci:")} </span>{' '} {t("Latihan kendiri untuk memperbaiki sebutan; tiada XP diberikan.")} </div>
             <div className="p-2 rounded-xl bg-white border border-amber-100">
-              <span className="font-semibold text-amber-800">
-                🎧 Ujian Mendengar SPM:
-              </span>{' '}
-              +15 XP untuk penghantaran pertama set pada hari tersebut, ditambah +10 XP bagi setiap jawapan betul. Mengulang set yang sama pada hari yang sama tidak menambah XP.
-            </div>
+              <span className="font-semibold text-amber-800"> {t("🎧 Ujian Mendengar SPM:")} </span>{' '} {t("+15 XP untuk penghantaran pertama set pada hari tersebut, ditambah +10 XP bagi setiap jawapan betul. Mengulang set yang sama pada hari yang sama tidak menambah XP.")} </div>
           </div>
         </div>
       )}
@@ -535,17 +472,17 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           <div className="px-3.5 py-1.5 rounded-xl bg-emerald-700 text-white shadow-xs font-bold text-xs flex items-center gap-1.5">
             <UserCheck className="w-3.5 h-3.5 text-emerald-200" />
-            <span>Papan Pendahulu Calon Berdaftar Sahaja ({registeredUsersCount})</span>
+            <span>{t("Papan Pendahulu Calon Berdaftar Sahaja (")}{registeredUsersCount})</span>
           </div>
           <div className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-medium flex items-center gap-1.5 border border-slate-200">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Privasi Terjamin: Alamat e-mel tidak dipaparkan</span>
+            <span>{t("Privasi Terjamin: Alamat e-mel tidak dipaparkan")}</span>
           </div>
         </div>
 
         <div className="text-xs text-slate-500 flex items-center gap-1.5">
           <Users className="w-3.5 h-3.5 text-slate-400" />
-          <span>{registeredUsersCount} Calon Berdaftar Aktif</span>
+          <span>{registeredUsersCount} {t("Calon Berdaftar Aktif")}</span>
         </div>
       </div>
 
@@ -582,9 +519,7 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
             <UserCheck className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Belum Ada Calon Berdaftar dalam Senarai
-            </h3>
+            <h3 className="text-sm font-bold text-slate-900"> {t("Belum Ada Calon Berdaftar dalam Senarai")} </h3>
             <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
               Jadilah calon SPM pertama yang mendaftar akaun rasmi untuk mengunci markah anda di tangga teratas papan pendahulu!
             </p>
@@ -636,10 +571,10 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                     {entry.isRegistered ? (
                       <span
                         className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold flex items-center gap-0.5"
-                        title="Calon Berdaftar Rasmi"
+                        title={t("Calon Berdaftar Rasmi")}
                       >
                         <UserCheck className="w-3 h-3 text-emerald-600" />
-                        <span>Calon Sah</span>
+                        <span>{t("Calon Sah")}</span>
                       </span>
                     ) : (
                       <span
@@ -651,16 +586,14 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                     )}
 
                     {isMe && (
-                      <span className="px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px] font-extrabold">
-                        ANDA
-                      </span>
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px] font-extrabold"> {t("ANDA")} </span>
                     )}
 
                     {getLeagueBadge(entry.league)}
                   </div>
 
                   <div className="text-xs text-slate-500 truncate flex items-center gap-1">
-                    <span>{entry.school || 'Calon SPM'}</span>
+                    <span>{entry.school || t("Calon SPM")}</span>
                     <span className="text-slate-300">•</span>
                     <span>{entry.state || 'Malaysia'}</span>
                   </div>
@@ -676,14 +609,12 @@ export const WeeklyLeaderboard: React.FC<WeeklyLeaderboardProps> = ({
                   </div>
                   <div className="text-[11px] text-slate-500 flex items-center justify-end gap-1">
                     <Flame className="w-3 h-3 text-orange-500 fill-orange-500" />
-                    <span>{entry.streak} hari</span>
+                    <span>{entry.streak} {t("hari")}</span>
                   </div>
                 </div>
 
                 <div className="text-center min-w-[52px]">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">
-                    Gred SPM
-                  </div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase"> {t("Gred SPM")} </div>
                   <span
                     className={`inline-block px-2 py-0.5 rounded-lg text-xs font-black ${
                       entry.predictedGrade === 'A+'

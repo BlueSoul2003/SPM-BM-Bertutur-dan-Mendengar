@@ -8,6 +8,14 @@ The first audience is students using the app directly, including under-18 studen
 
 Select and validate a provider whose terms permit the actual student audience before enabling live AI. Google's [Gemini Developer API terms](https://ai.google.dev/gemini-api/terms) currently restrict applications directed at or likely to be accessed by under-18s. Non-AI exercises and server scoring remain available. Cloud TTS is a separate optional service and needs its own deployment review.
 
+## Interface languages — 2026-10-04
+
+Bual now has Malay, English, Simplified Chinese and Tamil interfaces. The language selector is available before login and throughout practice; its device-local preference is independent of the dictionary translation language. Malay remains the default. Questions, passages, sample answers, recognition/audio language, scoring and student answers remain Malay. Switching interface language re-renders labels without remounting practice or clearing answers/checklists. Exported practice uses translated headings/checklists and retains the original answer.
+
+Translations are bundled locally in src/i18n/messages.ts; no AI translation calls, new dependencies, database migration or paid services are used. LanguageProvider handles persistence with a storage-disabled fallback and updates the document language. Malay passages/answers have language annotations, and Tamil headings/navigation allow taller text. Existing unavailable AI, payment and legacy recovery features remain disabled; their full legacy interfaces are outside this student release. Tamil translations have not had native-speaker editorial review.
+
+Verified locally: type check/build; all 13 automated tests, including translation-key coverage and interpolation checks; isolated browser login, English preference after reload, English-to-Chinese speaking-answer preservation, Tamil checklist/export preservation, Chinese-to-English listening submission (3/3, +45 XP) and saved history, and logout. Chinese desktop and Tamil mobile layouts were checked; Tamil at a 390px viewport has no horizontal overflow. Final type check/build and translation tests pass. Production rollout is pending. No real student records were changed. Next: publish to the existing Bual project after the final browser check; then select the interface language at the top of the public site.
+
 ## Run locally
 
 Requires Node.js 22+.

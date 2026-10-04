@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import React from 'react';
 
 interface InteractiveTextProps {
@@ -13,6 +14,7 @@ export const InteractiveText: React.FC<InteractiveTextProps> = ({
   className = '',
   highlightWords = []
 }) => {
+  const { t } = useTranslation();
   if (!text) return null;
 
   // Split text by sentences to provide context for definitions
@@ -23,7 +25,7 @@ export const InteractiveText: React.FC<InteractiveTextProps> = ({
   );
 
   return (
-    <span className={`inline leading-relaxed ${className}`}>
+    <span lang="ms" className={`inline leading-relaxed ${className}`}>
       {sentences.map((sentence, sIdx) => {
         // Regex to split into word tokens vs delimiter/punctuation/spacing tokens
         // Captures unicode letter sequences with optional hyphens (e.g., 'kanak-kanak', 'lestari')
@@ -55,7 +57,7 @@ export const InteractiveText: React.FC<InteractiveTextProps> = ({
                         onWordClick(token, sentence.trim());
                       }
                     }}
-                    title="Ketik perkataan untuk takrifan, terjemahan & sinonim"
+                    title={t("Ketik perkataan untuk takrifan, terjemahan & sinonim")}
                     className={`inline-block font-inherit text-inherit transition-all duration-150 rounded px-0.5 -my-0.5 cursor-pointer select-text
                       hover:bg-amber-200/90 hover:text-amber-950 active:scale-95 focus:outline-none focus:ring-1 focus:ring-amber-500
                       ${

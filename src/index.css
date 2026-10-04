@@ -69,3 +69,20 @@ button,a { touch-action:manipulation; }
 #mobile-bottom-nav [aria-current="page"] { color:#913b54; background:#fbe4e8; }
 #mobile-bottom-nav [aria-current="page"]>div { color:#913b54; background:transparent; }
 @media(max-width:640px) { .app-nav-layout { gap:8px; }.app-wordmark { width:100%; justify-content:center; font-size:26px; }.app-tools { justify-content:center; width:100%; gap:5px; }.app-tools>div:first-child { display:none; }.app-tools button,.app-tools select { min-height:36px; }.app-tools #navbar-user-profile-btn>span:nth-child(2) { display:none; } }
+
+/* Interface language is independent of Malay practice and dictionary language. */
+.language-bar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 24px; padding:10px clamp(12px,3vw,36px); background:#fffdf9; border-bottom:1px solid #eaded6; color:#624453; font:inherit; font-size:12px; line-height:1.6; }
+.language-bar label { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-weight:600; }
+.language-bar select { min-height:40px; max-width:100%; border:1px solid #d9c6cd; border-radius:10px; padding:6px 12px; background:white; color:#572639; font:inherit; }
+.language-bar select:focus-visible { outline:2px solid #913b54; outline-offset:3px; }
+.language-bar p { margin:0; max-width:46rem; }
+html:lang(ta) .bm-app { font-family:'Nirmala UI','Tamil Sangam MN','Latha',sans-serif; }
+html:lang(zh) .bm-app { font-family:system-ui,'Microsoft YaHei','PingFang SC',sans-serif; }
+html:lang(ta) .welcome-story h1 { font-size:clamp(30px,4vw,50px); line-height:1.5; letter-spacing:0; }
+html:lang(ta) .learning-greeting h1,html:lang(ta) .welcome-account>h2 { line-height:1.6; letter-spacing:0; }
+html:lang(ta) .eyebrow,html:lang(ta) .card-kicker,html:lang(ta) .path-top span { letter-spacing:0; line-height:1.8; }
+html:lang(ta) #mobile-bottom-nav button>span { white-space:normal; overflow:visible; line-height:1.6; }
+html:lang(ta) .app-desktop-tabs button { line-height:1.7; }
+html:lang(ta) .bm-app button { overflow-wrap:anywhere; }
+@media(max-width:640px) { .language-bar { align-items:flex-start; }.language-bar p { width:100%; font-size:11px; } }
+html:lang(ta) .companion-note { transform:none; padding-right:12px; min-width:0; }

@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import React, { useState } from 'react';
 import {
   X,
@@ -31,6 +32,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
   onClose,
   preferredLang
 }) => {
+  const { t } = useTranslation();
   const [activeView, setActiveView] = useState<'list' | 'flashcards'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
@@ -82,12 +84,9 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
               <Bookmark className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl font-bold font-serif text-white">
-                Buku Kosa Kata SPM (Word Bank)
-              </h3>
+              <h3 className="text-lg sm:text-xl font-bold font-serif text-white"> {t("Buku Kosa Kata SPM (Word Bank)")} </h3>
               <p className="text-xs text-slate-400">
-                {wordBank.length} perkataan disimpan &bull; {wordBank.filter(w => w.masteryLevel === 'mastered').length} telah dikuasai
-              </p>
+                {wordBank.length} {t("perkataan disimpan •")} {wordBank.filter(w => w.masteryLevel === 'mastered').length} {t("telah dikuasai")} </p>
             </div>
           </div>
 
@@ -102,9 +101,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <BookOpen className="w-3.5 h-3.5" />
-                Senarai
-              </button>
+                <BookOpen className="w-3.5 h-3.5" /> {t("Senarai")} </button>
               <button
                 type="button"
                 onClick={() => {
@@ -119,9 +116,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                     : 'text-slate-300 hover:text-white disabled:opacity-40'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                Kad Imbasan
-              </button>
+                <Layers className="w-3.5 h-3.5" /> {t("Kad Imbasan")} </button>
             </div>
 
             <button
@@ -144,7 +139,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Cari kosa kata, sinonim atau kata dasar..."
+                  placeholder={t("Cari kosa kata, sinonim atau kata dasar...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-2 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -159,12 +154,10 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                   <Bookmark className="w-8 h-8 mx-auto text-slate-300" />
                   <p className="text-sm font-medium text-slate-600">
                     {wordBank.length === 0
-                      ? 'Belum ada perkataan disimpan.'
-                      : 'Tiada perkataan yang sepadan.'}
+                      ? t("Belum ada perkataan disimpan.")
+                      : t("Tiada perkataan yang sepadan.")}
                   </p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Ketik mana-mana perkataan dalam teks semasa latihan dan klik ikon penanda buku untuk menyimpannya di sini.
-                  </p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto"> {t("Ketik mana-mana perkataan dalam teks semasa latihan dan klik ikon penanda buku untuk menyimpannya di sini.")} </p>
                 </div>
               ) : (
                 filteredWords.map((item) => (
@@ -186,7 +179,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                           type="button"
                           onClick={() => handleSpeak(item.word)}
                           className="p-1 rounded-md text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer"
-                          title="Dengar Sebutan"
+                          title={t("Dengar Sebutan")}
                         >
                           <Volume2 className="w-3.5 h-3.5" />
                         </button>
@@ -198,7 +191,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
 
                       {item.synonyms && item.synonyms.length > 0 && (
                         <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                          <span className="text-[11px] font-semibold text-slate-400">Sinonim:</span>
+                          <span className="text-[11px] font-semibold text-slate-400">{t("Sinonim:")}</span>
                           {item.synonyms.slice(0, 3).map((s, idx) => (
                             <span
                               key={idx}
@@ -226,7 +219,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                             ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
                             : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
                         }`}
-                        title="Tandakan status penguasaan"
+                        title={t("Tandakan status penguasaan")}
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         {item.masteryLevel === 'mastered' ? 'Dikuasai' : 'Belajar'}
@@ -236,7 +229,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                         type="button"
                         onClick={() => onRemoveWord(item.word)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                        title="Padam daripada buku kosa kata"
+                        title={t("Padam daripada buku kosa kata")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -252,9 +245,9 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
             {filteredWords.length > 0 && currentFlashcard ? (
               <div className="w-full max-w-md space-y-4">
                 <div className="flex justify-between items-center text-xs font-semibold text-slate-400">
-                  <span>Kad Imbasan SPM</span>
+                  <span>{t("Kad Imbasan SPM")}</span>
                   <span>
-                    {currentFlashcardIndex + 1} daripada {filteredWords.length}
+                    {currentFlashcardIndex + 1} {t("daripada")} {filteredWords.length}
                   </span>
                 </div>
 
@@ -270,20 +263,17 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                   {!isCardFlipped ? (
                     <div className="space-y-3">
                       <span className="text-xs uppercase tracking-widest text-amber-400 font-semibold">
-                        {currentFlashcard.partOfSpeech || 'Kosa Kata SPM'}
+                        {currentFlashcard.partOfSpeech || t("Kosa Kata SPM")}
                       </span>
                       <h4 className="text-2xl sm:text-3xl font-bold font-serif capitalize">
                         {currentFlashcard.word}
                       </h4>
                       {currentFlashcard.rootWord && (
-                        <p className="text-xs text-slate-400">
-                          Kata dasar: {currentFlashcard.rootWord}
+                        <p className="text-xs text-slate-400"> {t("Kata dasar:")} {currentFlashcard.rootWord}
                         </p>
                       )}
                       <p className="text-xs text-slate-400 pt-3 flex items-center justify-center gap-1">
-                        <RotateCcw className="w-3 h-3" />
-                        Ketik untuk melihat maksud & contoh ayat
-                      </p>
+                        <RotateCcw className="w-3 h-3" /> {t("Ketik untuk melihat maksud & contoh ayat")} </p>
                     </div>
                   ) : (
                     <div className="space-y-3 text-left w-full">
@@ -309,7 +299,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
 
                       {currentFlashcard.synonyms.length > 0 && (
                         <div className="text-xs text-slate-600">
-                          <span className="font-semibold text-emerald-900">Sinonim: </span>
+                          <span className="font-semibold text-emerald-900">{t("Sinonim:")} </span>
                           {currentFlashcard.synonyms.join(', ')}
                         </div>
                       )}
@@ -333,9 +323,7 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                       setIsCardFlipped(false);
                     }}
                     className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold disabled:opacity-40 transition-colors cursor-pointer"
-                  >
-                    &larr; Sebelumnya
-                  </button>
+                  > {t("← Sebelumnya")} </button>
 
                   <button
                     type="button"
@@ -350,8 +338,8 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {currentFlashcard.masteryLevel === 'mastered'
-                      ? 'Telah Dikuasai'
-                      : 'Tandakan Dikuasai'}
+                      ? t("Telah Dikuasai")
+                      : t("Tandakan Dikuasai")}
                   </button>
 
                   <button
@@ -364,27 +352,23 @@ export const WordBankModal: React.FC<WordBankModalProps> = ({
                       setIsCardFlipped(false);
                     }}
                     className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold disabled:opacity-40 transition-colors cursor-pointer"
-                  >
-                    Seterusnya &rarr;
-                  </button>
+                  > {t("Seterusnya →")} </button>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-400">Tiada kad imbasan.</p>
+              <p className="text-xs text-slate-400">{t("Tiada kad imbasan.")}</p>
             )}
           </div>
         )}
 
         {/* Footer */}
         <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <span>Kosa kata tersimpan secara automatik pada peranti anda</span>
+          <span>{t("Kosa kata tersimpan secara automatik pada peranti anda")}</span>
           <button
             type="button"
             onClick={onClose}
             className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-medium transition-colors cursor-pointer"
-          >
-            Tutup
-          </button>
+          > {t("Tutup")} </button>
         </div>
       </div>
     </div>

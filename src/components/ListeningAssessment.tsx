@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import React, { useState, useEffect } from 'react';
 import {
   Headphones,
@@ -37,6 +38,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
   onWordClick,
   onEarnPoints,
 }) => {
+  const { t } = useTranslation();
   // Navigation State: 'set_selection' (Page 1) vs 'exam_session' (Page 2)
   const [currentPage, setCurrentPage] = useState<'set_selection' | 'exam_session'>('set_selection');
 
@@ -184,7 +186,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4 font-sans pb-12">
-      {audioError && <p role="alert" className="bg-amber-50 p-3 rounded-xl text-sm">{audioError}</p>}
+      {audioError && <p role="alert" className="bg-amber-50 p-3 rounded-xl text-sm">{t(audioError)}</p>}
       {/* ========================================================================= */}
       {/* HALAMAN 1: PILIH SET UJIAN MENDENGAR (52 SET LENGKAP)                     */}
       {/* ========================================================================= */}
@@ -199,22 +201,18 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <h2 className="text-base sm:text-xl font-extrabold font-serif text-white tracking-tight">
-                      Ujian Mendengar Bahasa Melayu
-                    </h2>
+                    <h2 className="text-base sm:text-xl font-extrabold font-serif text-white tracking-tight"> {t("Ujian Mendengar Bahasa Melayu")} </h2>
                     <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-amber-400 text-slate-950">
                       SPM 1103/4
                     </span>
                   </div>
-                  <p className="text-xs text-teal-200 mt-0.5">
-                    Latihan kendiri berdasarkan format SPM &bull; 30 Markah &bull; 52 Set Praktis
-                  </p>
+                  <p className="text-xs text-teal-200 mt-0.5"> {t("Latihan kendiri berdasarkan format SPM • 30 Markah • 52 Set Praktis")} </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 text-xs bg-white/10 px-3 py-1.5 rounded-xl border border-white/15 text-emerald-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-semibold">🇲🇾 Suara peranti · bergantung pada pelayar</span>
+                <span className="font-semibold">{t("🇲🇾 Suara peranti · bergantung pada pelayar")}</span>
               </div>
             </div>
 
@@ -224,7 +222,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Cari petikan, tema, atau kata kunci (contoh: sukan, alam sekitar, teknologi)..."
+                  placeholder={t("Cari petikan, tema, atau kata kunci (contoh: sukan, alam sekitar, teknologi)...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-white/10 hover:bg-white/15 focus:bg-white/20 border border-white/20 rounded-2xl text-xs sm:text-sm text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-400 transition-all"
@@ -253,7 +251,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                         : 'bg-white/10 hover:bg-white/20 text-teal-100 border border-white/10'
                     }`}
                   >
-                    {g === 'all' ? 'Semua Genre (52 Set)' : g}
+                    {g === 'all' ? t("Semua Genre (52 Set)") : g}
                   </button>
                 ))}
               </div>
@@ -262,10 +260,8 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
 
           {/* Set Count Display */}
           <div className="flex items-center justify-between px-1 text-xs text-slate-500">
-            <span>
-              Menunjukkan <strong>{filteredTracks.length}</strong> set petikan SPM
-            </span>
-            <span className="text-slate-400">Pilih mana-mana set untuk memulakan audio & soalan</span>
+            <span> {t("Menunjukkan")} <strong>{filteredTracks.length}</strong> {t("set petikan SPM")} </span>
+            <span className="text-slate-400">{t("Pilih mana-mana set untuk memulakan audio & soalan")}</span>
           </div>
 
           {/* Grid of Sets: Mobile-friendly large cards */}
@@ -292,8 +288,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                       <h3 className="text-sm font-bold text-slate-900 group-hover:text-teal-900 font-serif line-clamp-2 leading-snug">
                         {track.title}
                       </h3>
-                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">
-                        Tema: <span className="font-medium text-slate-700">{track.theme}</span>
+                      <p className="text-[11px] text-slate-500 mt-1 line-clamp-1"> {t("Tema:")} <span className="font-medium text-slate-700">{track.theme}</span>
                       </p>
                     </div>
                   </div>
@@ -301,10 +296,8 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                   <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                     <span className="text-slate-500 flex items-center gap-1 font-medium">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      ~{track.audioDurationSeconds}s &bull; {track.questions.length} Soalan
-                    </span>
-                    <span className="font-bold text-teal-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                      Mula Set <ChevronRight className="w-3.5 h-3.5" />
+                      ~{track.audioDurationSeconds}s &bull; {track.questions.length} {t("Soalan")} </span>
+                    <span className="font-bold text-teal-700 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform"> {t("Mula Set")} <ChevronRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
@@ -327,12 +320,11 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
               className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Kembali ke Senarai Set</span>
+              <span>{t("Kembali ke Senarai Set")}</span>
             </button>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-slate-600 hidden sm:inline-block">
-                Set {currentTrackIndex + 1} daripada {SPM_LISTENING_TRACKS.length}
+              <span className="text-xs font-bold text-slate-600 hidden sm:inline-block"> {t("Set")} {currentTrackIndex + 1} {t("daripada")} {SPM_LISTENING_TRACKS.length}
               </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 font-bold border border-teal-300">
                 {selectedTrack.genre}
@@ -344,11 +336,9 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
           <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-teal-950 text-white rounded-3xl p-4 sm:p-6 border border-teal-900/60 shadow-md space-y-4">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[10px] font-bold uppercase tracking-widest text-teal-400 flex items-center gap-1">
-                <Headphones className="w-3.5 h-3.5" />
-                Format Rasmi SPM 1103/4 &bull; Ujian Mendengar (30 Markah)
-              </span>
+                <Headphones className="w-3.5 h-3.5" /> {t("Format Rasmi SPM 1103/4 • Ujian Mendengar (30 Markah)")} </span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-amber-300 font-semibold">
-                {listeningRound === 1 ? 'Bacaan Kali Pertama' : 'Bacaan Kali Kedua (Semakan)'}
+                {listeningRound === 1 ? t("Bacaan Kali Pertama") : t("Bacaan Kali Kedua (Semakan)")}
               </span>
             </div>
 
@@ -356,9 +346,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
               <h2 className="text-base sm:text-xl font-bold font-serif text-white leading-snug">
                 {selectedTrack.title}
               </h2>
-              <p className="text-xs text-teal-200 mt-1">
-                Tema: {selectedTrack.theme} &bull; Dengar dengan teliti sebelum menjawab soalan di bawah.
-              </p>
+              <p className="text-xs text-teal-200 mt-1"> {t("Tema:")} {selectedTrack.theme} {t("• Dengar dengan teliti sebelum menjawab soalan di bawah.")} </p>
             </div>
 
             {/* Audio Controller Bar */}
@@ -367,7 +355,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
                   id="play-listening-audio-btn"
-                  aria-label={isPlaying ? 'Hentikan audio petikan' : 'Mainkan audio petikan'}
+                  aria-label={isPlaying ? t("Hentikan audio petikan") : t("Mainkan audio petikan")}
                   type="button"
                   onClick={handlePlayFullAudio}
                   className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-md transition-all cursor-pointer active:scale-95 shrink-0 ${
@@ -385,11 +373,9 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
 
                 <div className="leading-tight">
                   <span className="text-[11px] font-bold text-amber-300 block">
-                    {isPlaying ? 'Sedang Memainkan Audio SPM...' : 'Ketik untuk Dengar Audio'}
+                    {isPlaying ? t("Sedang Memainkan Audio SPM...") : t("Ketik untuk Dengar Audio")}
                   </span>
-                  <span className="text-[11px] text-slate-300">
-                    🇲🇾 Bahasa Melayu (Malaysia)
-                  </span>
+                  <span className="text-[11px] text-slate-300"> {t("🇲🇾 Bahasa Melayu (Malaysia)")} </span>
                 </div>
               </div>
 
@@ -420,14 +406,14 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                   className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border border-white/15"
                 >
                   <FileText className="w-3.5 h-3.5 text-amber-300" />
-                  <span>{showTranscript ? 'Tutup Teks' : 'Lihat Teks'}</span>
+                  <span>{showTranscript ? t("Tutup Teks") : t("Lihat Teks")}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleResetCurrentSet}
                   className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white cursor-pointer"
-                  title="Ulang semula ujian set ini"
+                  title={t("Ulang semula ujian set ini")}
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
@@ -439,10 +425,8 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
               <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 space-y-2.5 animate-in fade-in text-xs">
                 <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2">
                   <span className="font-bold text-amber-300 flex items-center gap-1">
-                    <FileText className="w-3.5 h-3.5" />
-                    Transkrip Audio Penuh
-                  </span>
-                  <span className="text-[10px]">💡 Ketik mana-mana perkataan untuk kamus</span>
+                    <FileText className="w-3.5 h-3.5" /> {t("Transkrip Audio Penuh")} </span>
+                  <span className="text-[10px]">{t("💡 Ketik mana-mana perkataan untuk kamus")}</span>
                 </div>
                 <div className="text-slate-200 leading-relaxed font-serif max-h-48 overflow-y-auto pr-1">
                   <InteractiveText text={selectedTrack.script} onWordClick={onWordClick} />
@@ -455,16 +439,11 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
           <div className="bg-white rounded-3xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base sm:text-lg font-bold font-serif text-slate-900">
-                  Soalan Pemahaman Mendengar (Kertas 4)
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Jawab semua soalan berdasarkan petikan yang telah diperdengarkan.
-                </p>
+                <h3 className="text-base sm:text-lg font-bold font-serif text-slate-900"> {t("Soalan Pemahaman Mendengar (Kertas 4)")} </h3>
+                <p className="text-xs text-slate-500"> {t("Jawab semua soalan berdasarkan petikan yang telah diperdengarkan.")} </p>
               </div>
               <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700">
-                {Object.keys(userAnswers).length}/{totalQuestions} Dijawab
-              </span>
+                {Object.keys(userAnswers).length}/{totalQuestions} {t("Dijawab")} </span>
             </div>
 
             {/* Questions List */}
@@ -502,9 +481,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                           {question.prompt}
                         </div>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200 shrink-0">
-                        1 Markah
-                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white text-slate-600 border border-slate-200 shrink-0"> {t("1 Markah")} </span>
                     </div>
 
                     {/* Question Interactive Controls */}
@@ -593,7 +570,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                           value={userVal || ''}
                           onChange={(e) => handleSelectAnswer(question.id, e.target.value)}
                           disabled={isGraded}
-                          placeholder="Taip jawapan tepat mengikut petikan audio..."
+                          placeholder={t("Taip jawapan tepat mengikut petikan audio...")}
                           className={`w-full p-2.5 bg-white border rounded-xl text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 ${
                             isGraded
                               ? isListeningAnswerCorrect(userVal, question)
@@ -606,13 +583,10 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                           <div className="flex items-center gap-1.5 text-xs font-bold">
                             {isListeningAnswerCorrect(userVal, question) ? (
                               <span className="text-emerald-700 flex items-center gap-1 bg-emerald-100/70 border border-emerald-200 px-2 py-0.5 rounded-lg">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                Jawapan Anda Diterima (Betul)
-                              </span>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> {t("Jawapan Anda Diterima (Betul)")} </span>
                             ) : (
                               <span className="text-rose-700 flex items-center gap-1 bg-rose-100/70 border border-rose-200 px-2 py-0.5 rounded-lg">
-                                <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                                Kurang tepat. Skema Diterima: {String(question.correctAnswer)}
+                                <XCircle className="w-3.5 h-3.5 text-rose-600" /> {t("Kurang tepat. Skema Diterima:")} {String(question.correctAnswer)}
                               </span>
                             )}
                           </div>
@@ -625,13 +599,12 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                       <div className="mt-2.5 p-2.5 rounded-xl bg-white border border-slate-200 text-xs space-y-1">
                         <div className="flex items-center gap-1 font-bold text-slate-800">
                           <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Penerangan Skema SPM:</span>
+                          <span>{t("Penerangan Skema SPM:")}</span>
                         </div>
                         <p className="text-slate-600 leading-relaxed text-[11px] sm:text-xs">
                           {question.explanation}
                         </p>
-                        <p className="text-[11px] text-teal-800 font-medium">
-                          Jawapan Tepat: <strong>{String(question.correctAnswer)}</strong>
+                        <p className="text-[11px] text-teal-800 font-medium"> {t("Jawapan Tepat:")} <strong>{typeof question.correctAnswer === 'boolean' ? (question.correctAnswer ? 'BETUL' : 'SALAH') : String(question.correctAnswer)}</strong>
                         </p>
                       </div>
                     )}
@@ -643,7 +616,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
             {/* Submission / Grade Action */}
             {!isGraded ? (
               <div className="pt-2">
-                {submissionError && <p role="alert" className="text-rose-700 mb-3">{submissionError}</p>}
+                {submissionError && <p role="alert" className="text-rose-700 mb-3">{t(submissionError)}</p>}
                 <button
                   id="submit-listening-answers-btn"
                   type="button"
@@ -656,7 +629,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                   }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Hantar & Semak Jawapan SPM (Semakan Latihan)</span>
+                  <span>{t("Hantar & Semak Jawapan SPM (Semakan Latihan)")}</span>
                 </button>
               </div>
             ) : (
@@ -665,19 +638,16 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                 <div className="bg-gradient-to-br from-slate-950 via-teal-950 to-slate-950 text-white rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4 border border-teal-800">
                   <div className="space-y-1">
                     <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1">
-                      <Award className="w-3.5 h-3.5" />
-                      Keputusan Ujian Mendengar (1103/4)
-                    </span>
+                      <Award className="w-3.5 h-3.5" /> {t("Keputusan Ujian Mendengar (1103/4)")} </span>
                     <h3 className="text-base sm:text-lg font-bold font-serif text-white">
-                      {currentGradeInfo.label}
+                      {t(currentGradeInfo.label)}
                     </h3>
-                    <p className="text-xs text-teal-200">
-                      Anda berjaya menjawab {correctCount} daripada {totalQuestions} soalan dengan tepat ({percentage}%).
+                    <p className="text-xs text-teal-200"> {t("Anda berjaya menjawab")} {correctCount} {t("daripada")} {totalQuestions} {t("soalan dengan tepat (")}{percentage}%).
                     </p>
                   </div>
 
                   <div className="text-center bg-white/10 px-4 py-2.5 rounded-2xl border border-white/20 shrink-0">
-                    <span className="text-[9px] uppercase font-bold text-amber-300 block">Gred SPM</span>
+                    <span className="text-[9px] uppercase font-bold text-amber-300 block">{t("Gred SPM")}</span>
                     <div className="text-2xl sm:text-3xl font-black text-amber-400">{currentGradeInfo.grade}</div>
                     <span className="text-[10px] text-white font-mono font-bold">{scaledSpmScore}/30m</span>
                   </div>
@@ -691,7 +661,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                     className="flex-1 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Cuba Semula Set Ini</span>
+                    <span>{t("Cuba Semula Set Ini")}</span>
                   </button>
 
                   <button
@@ -702,7 +672,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                     }}
                     className="flex-1 py-3 px-4 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm"
                   >
-                    <span>Set Seterusnya</span>
+                    <span>{t("Set Seterusnya")}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -711,7 +681,7 @@ export const ListeningAssessment: React.FC<ListeningAssessmentProps> = ({
                     onClick={handleBackToSetList}
                     className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors shadow-sm"
                   >
-                    <span>Senarai 52 Set</span>
+                    <span>{t("Senarai 52 Set")}</span>
                   </button>
                 </div>
               </div>

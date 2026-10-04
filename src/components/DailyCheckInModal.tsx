@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import { apiFetch } from '../services/api';
 import React, { useState } from 'react';
 import {
@@ -32,6 +33,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
   userProgress,
   onCheckInSuccess,
 }) => {
+  const { t } = useTranslation();
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError,setClaimError]=useState('');
   const [claimedJustNow, setClaimedJustNow] = useState(false);
@@ -72,7 +74,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
             id="close-checkin-btn"
             onClick={onClose}
             className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center text-white transition-colors"
-            aria-label="Tutup"
+            aria-label={t("Tutup")}
           >
             <X className="w-4 h-4" />
           </button>
@@ -81,22 +83,15 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
             <span className="p-1.5 rounded-xl bg-white/20">
               <Calendar className="w-5 h-5 text-white" />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-amber-100">
-              Ganjaran Harian SPM
-            </span>
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-100"> {t("Ganjaran Harian SPM")} </span>
           </div>
 
-          <h2 className="text-xl font-bold text-white mb-1">
-            Daftar Masuk Harian
-          </h2>
-          <p className="text-xs text-orange-100 leading-relaxed">
-            Kekalkan rentak latihan setiap hari untuk mengumpul mata pertarungan
-            dan menakluki Papan Pendahulu XP!
-          </p>
+          <h2 className="text-xl font-bold text-white mb-1"> {t("Daftar Masuk Harian")} </h2>
+          <p className="text-xs text-orange-100 leading-relaxed"> {t("Kekalkan rentak latihan setiap hari untuk mengumpul mata pertarungan dan menakluki Papan Pendahulu XP!")} </p>
 
           <div className="mt-3 inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-semibold">
             <Flame className="w-4 h-4 text-amber-200 fill-amber-300 animate-pulse" />
-            <span>Rentak Semasa: {userProgress.streak} Hari Berturut-turut</span>
+            <span>{t("Rentak Semasa:")} {userProgress.streak} {t("Hari Berturut-turut")}</span>
           </div>
         </div>
 
@@ -125,7 +120,7 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
                   }`}
                 >
                   <div className="text-[11px] font-bold text-slate-500 mb-1">
-                    {item.label}
+                    {t('Hari {day}', { day: item.day })}
                   </div>
 
                   <div className="my-1 text-2xl">
@@ -141,22 +136,18 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
                   </div>
 
                   {isClaimed && (
-                    <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-full mt-1">
-                      Dituntut
-                    </span>
+                    <span className="text-[9px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded-full mt-1"> {t("Dituntut")} </span>
                   )}
 
                   {!isClaimed && isToday && canClaimToday && (
-                    <span className="text-[9px] font-bold text-amber-800 bg-amber-200 px-1.5 py-0.5 rounded-full mt-1">
-                      Hari Ini!
-                    </span>
+                    <span className="text-[9px] font-bold text-amber-800 bg-amber-200 px-1.5 py-0.5 rounded-full mt-1"> {t("Hari Ini!")} </span>
                   )}
                 </div>
               );
             })}
           </div>
 
-          {claimError && <p role="alert" className="text-rose-700 mb-3">{claimError}</p>}
+          {claimError && <p role="alert" className="text-rose-700 mb-3">{t(claimError)}</p>}
           {/* Action Button */}
           {canClaimToday && !claimedJustNow ? (
             <button
@@ -168,20 +159,17 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
               <Gift className="w-5 h-5 animate-bounce" />
               <span>
                 {isClaiming
-                  ? 'Menebus Mata...'
-                  : `Tuntut +${
+                  ? t("Menebus Mata...")
+                  : t('Tuntut +{xp} XP Hari Ini!', { xp:
                       DAILY_STREAK_REWARDS.find((r) => r.day === todayDayIndex)
                         ?.xp || 20
-                    } XP Hari Ini!`}
+                     })}
               </span>
             </button>
           ) : (
             <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-center text-xs font-medium flex items-center justify-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>
-                Tahniah! Anda sudah menuntut ganjaran hari ini. Kembali lagi
-                esok untuk ganjaran seterusnya!
-              </span>
+              <span> {t("Tahniah! Anda sudah menuntut ganjaran hari ini. Kembali lagi esok untuk ganjaran seterusnya!")} </span>
             </div>
           )}
 
@@ -189,11 +177,8 @@ export const DailyCheckInModal: React.FC<DailyCheckInModalProps> = ({
           <div className="mt-4 p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-start gap-2.5 text-xs text-slate-600">
             <span className="text-base leading-none mt-0.5">💡</span>
             <div>
-              <span className="font-semibold text-slate-800">
-                Petua Cikgu Maya:{' '}
-              </span>
-              Luangkan beberapa minit setiap hari untuk berlatih. Baca semula jawapan anda dan pilih satu perkara untuk diperbaiki.
-            </div>
+              <span className="font-semibold text-slate-800"> {t("Petua Cikgu Maya:")}{' '}
+              </span> {t("Luangkan beberapa minit setiap hari untuk berlatih. Baca semula jawapan anda dan pilih satu perkara untuk diperbaiki.")} </div>
           </div>
         </div>
       </div>

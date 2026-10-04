@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n/LanguageProvider';
 import React from 'react';
 import { Mic, Headphones, Trophy, Bot } from 'lucide-react';
 import { ActiveTab } from '../types';
@@ -17,6 +18,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   isRegistered = true,
   onOpenAuthModal,
 }) => {
+  const { t } = useTranslation();
   const tabs = [
     {
       id: 'speaking' as ActiveTab,
@@ -46,7 +48,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
       id="mobile-bottom-nav"
       className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-1 py-1 flex justify-around items-center shadow-lg"
       style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom))' }}
-      aria-label="Navigasi Mudah Alih"
+      aria-label={t("Navigasi Mudah Alih")}
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -85,7 +87,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             </div>
 
             <span className="text-[10px] mt-0.5 tracking-tight truncate max-w-full">
-              {tab.label}
+              {t(tab.label)}
             </span>
 
             {isActive && (
