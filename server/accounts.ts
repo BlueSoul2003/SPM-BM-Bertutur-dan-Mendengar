@@ -131,9 +131,9 @@ export function accountRoutes(db: Database, sessions: PersistentSessions) {
       return {progress:progress(updated),awarded:reward};
     });res.json(result);
   }));
-  router.get('/leaderboard',route(async(_req,res)=>{
-    const rows=(await db.query('SELECT * FROM accounts ORDER BY points DESC,id LIMIT 100')).rows;
-    const entries=rows.map((r,i)=>({id:r.id,rank:i+1,name:r.profile.studentName||'Calon SPM',school:r.profile.schoolName||'',state:r.profile.state||'Malaysia',avatar:r.profile.avatar||'⭐',points:r.points,streak:r.streak,predictedGrade:r.last_grade?.grade||'—',username:'',isRegistered:true,isCurrentUser:false,trend:'same',league:i<3?'diamond':i<8?'gold':i<14?'silver':'bronze'}));
+  router.get('/leaderboard',auth,route(async(_req,res)=>{
+    const rows=(await db.query("SELECT id,profile->>'studentName' AS name,profile->>'avatar' AS avatar,points,streak FROM accounts ORDER BY points DESC,id LIMIT 100")).rows;
+    const entries=rows.map((r,i)=>({id:r.id,rank:i+1,name:r.name||'Calon SPM',school:'',state:'',avatar:r.avatar||'⭐',points:r.points,streak:r.streak,predictedGrade:'—',username:'',isRegistered:true,isCurrentUser:false,trend:'same',league:i<3?'diamond':i<8?'gold':i<14?'silver':'bronze'}));
     const total=Number((await db.query('SELECT count(*) AS n FROM accounts')).rows[0].n);
     res.json({entries,totalRealUsers:total,registeredCount:total});
   }));

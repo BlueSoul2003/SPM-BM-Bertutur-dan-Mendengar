@@ -1,3 +1,4 @@
+import { validDictionaryInput, isDictionaryData } from '../utils/dictionaryValidation';
 import { apiFetch } from './api';
 import {
   ChatMessage,
@@ -5,15 +6,6 @@ import {
   DictionaryData,
   TargetLanguage
 } from '../types';
-import { BUILTIN_DICTIONARY } from '../data/spmTopics';
-import { KAMUS_SPM_LENGKAP } from '../data/kamusData';
-import { getSpeakingModelAnswer } from '../data/spmModelAnswers';
-
-// Master dictionary combining all curated lexicons
-const MASTER_DICTIONARY: Record<string, DictionaryData> = {
-  ...BUILTIN_DICTIONARY,
-  ...KAMUS_SPM_LENGKAP
-};
 
 export async function sendChatMessageToAI(
   messages: ChatMessage[],
@@ -50,6 +42,7 @@ export async function evaluateSpeakingResponse(
   questionAsked?: string,
   topicId?: string
 ): Promise<SpeakingAssessmentResult> {
+  const { getSpeakingModelAnswer } = await import('../data/spmModelAnswers');
   const modelAnswer = getSpeakingModelAnswer(
     topicId || stimulusTopic,
     stimulusTopic,
@@ -85,28 +78,30 @@ export async function evaluateSpeakingResponse(
   }
 }
 
-// In-memory client cache to guarantee instant sub-millisecond repeated lookups
-const clientDictCache = new Map<string, DictionaryData>();
+// Never retain contextual results across lookups or account changes.
 
 export async function lookupDictionaryWord(
   rawWord: string,
   contextSentence?: string,
   targetLang: TargetLanguage = 'en'
 ): Promise<DictionaryData> {
+  if (!validDictionaryInput(rawWord, contextSentence)) throw new Error('Permintaan kamus tidak sah.');
   const cleanWord = rawWord.toLowerCase().replace(/[^a-zA-Z\u00C0-\u024F\-]/g, '').trim();
 
-  // 1. In-memory client cache
-  if (clientDictCache.has(cleanWord)) {
-    return clientDictCache.get(cleanWord)!;
-  }
+  if (!cleanWord) throw new Error('Perkataan diperlukan.');
+
+  // Load learning material when used, not on the public login page.
+  const [{ BUILTIN_DICTIONARY }, { KAMUS_SPM_LENGKAP }] = await Promise.all([
+    import('../data/spmTopics'), import('../data/kamusData')
+  ]);
+  const MASTER_DICTIONARY: Record<string, DictionaryData> = { ...BUILTIN_DICTIONARY, ...KAMUS_SPM_LENGKAP };
 
   // 2. Direct master dictionary exact word match
-  if (MASTER_DICTIONARY[cleanWord]) {
+  if (Object.hasOwn(MASTER_DICTIONARY, cleanWord)) {
     const entry: DictionaryData = {
       ...MASTER_DICTIONARY[cleanWord],
       word: cleanWord
     };
-    clientDictCache.set(cleanWord, entry);
     return entry;
   }
 
@@ -124,13 +119,7 @@ export async function lookupDictionaryWord(
 
     if (res.ok) {
       const serverData = await res.json();
-      if (
-        serverData &&
-        serverData.word &&
-        serverData.definitions &&
-        serverData.definitions.ms
-      ) {
-        clientDictCache.set(cleanWord, serverData);
+      if (isDictionaryData(serverData)) {
         return serverData;
       }
     }
@@ -163,7 +152,7 @@ export async function lookupDictionaryWord(
   }
 
   for (const candidate of possibleRoots) {
-    if (candidate && candidate !== cleanWord && MASTER_DICTIONARY[candidate]) {
+    if (candidate && candidate !== cleanWord && Object.hasOwn(MASTER_DICTIONARY, candidate)) {
       const baseEntry = MASTER_DICTIONARY[candidate];
       const isVerb = /^(me|ber|ter|di|memper)/.test(cleanWord);
       
@@ -190,7 +179,6 @@ export async function lookupDictionaryWord(
           : baseEntry.spmSampleSentence,
         spmTips: baseEntry.spmTips
       };
-      clientDictCache.set(cleanWord, derivedEntry);
       return derivedEntry;
     }
   }
@@ -234,7 +222,6 @@ export async function lookupDictionaryWord(
     spmTips: 'Gunakan kosa kata ini secara gramatis dan selitkan penanda wacana yang sesuai untuk meraih markah cemerlang.'
   };
 
-  clientDictCache.set(cleanWord, finalFallback);
   return finalFallback;
 }
 

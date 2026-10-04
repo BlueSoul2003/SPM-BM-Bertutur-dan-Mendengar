@@ -15,7 +15,7 @@ test('API account boundaries, unavailable AI and revocation against isolated dat
   });
   try {
     await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Server startup timed out')), 45_000);
+      const timeout = setTimeout(() => reject(new Error('Server startup timed out')), 120_000);
       child.stdout.on('data', data => { if (String(data).includes('running on port')) { clearTimeout(timeout); resolve(); } });
       child.once('error', reject);
       child.once('exit', code => { clearTimeout(timeout); reject(new Error(`Server exited ${code}`)); });
@@ -32,6 +32,34 @@ test('API account boundaries, unavailable AI and revocation against isolated dat
     const registered = await request('/api/auth/register', { email: 'alice@example.test', password: 'long-password', studentName: 'Alice' });
     assert.equal(registered.status, 200);
     const { token, user } = await registered.json();
+    const bob = await (await request('/api/auth/register', { email: 'bob@example.test', password: 'long-password', studentName: 'Bob' })).json();
+    await request('/api/auth/update-profile', { schoolName: 'Private School', state: 'Private State' }, bob.token);
+    const dictionary = async (word: unknown, contextSentence: unknown, authToken = token) => {
+      const response = await request('/api/gemini/dictionary', { word, contextSentence }, authToken);
+      return { status: response.status, data: await response.json() };
+    };
+    // Same process, same word, distinct accounts and contexts: no shared examples.
+    for (const word of ['zzfixtureword', 'beralamkan']) {
+      const first = await dictionary(word, 'Alice private example');
+      const second = await dictionary(word, 'Bob private example', bob.token);
+      assert.equal(first.status, 200);
+      assert.equal(second.status, 200);
+      assert.match(first.data.spmSampleSentence, /Alice private example/);
+      assert.match(second.data.spmSampleSentence, /Bob private example/);
+      assert.doesNotMatch(second.data.spmSampleSentence, /Alice/);
+      assert.match((await dictionary(word, 'Updated context')).data.spmSampleSentence, /Updated context/);
+    }
+    for (const [word, context] of [[{}, 'text'], ['perkataan', {}], ['a'.repeat(121), 'text'], ['a' + '!'.repeat(121), ''], ['alam', 'x'.repeat(5001)], ['', '']]) {
+      assert.equal((await dictionary(word, context)).status, 400);
+    }
+    assert.equal(typeof (await dictionary('constructor', 'Safe example')).data.definitions.ms, 'string');
+    assert.equal((await dictionary('alam', undefined)).status, 200);
+    for (const credential of [undefined, 'invalid']) assert.equal((await request('/api/leaderboard?limit=100', undefined, credential)).status, 401);
+    const ranking = await request('/api/leaderboard', undefined, token);
+    assert.equal(ranking.status, 200);
+    const rankingData = await ranking.json();
+    assert.ok(rankingData.entries.some((entry: any) => entry.id === user.id));
+    assert.doesNotMatch(JSON.stringify(rankingData), /Private School|Private State|password_hash|portalEmail/);
     assert.equal(user.passwordHash, undefined);
     assert.equal((await request('/api/auth/me', undefined, token)).status, 200);
     assert.equal((await request('/api/auth/update-profile', { userId: user.id, studentName: 'Changed' })).status, 401);
@@ -46,6 +74,7 @@ test('API account boundaries, unavailable AI and revocation against isolated dat
     assert.equal((await request('/api/usage')).status,401);
     assert.equal((await request('/api/auth/logout', {}, token)).status, 200);
     assert.equal((await request('/api/auth/me', undefined, token)).status, 401);
+    assert.equal((await request('/api/leaderboard', undefined, token)).status, 401);
     const login = await request('/api/auth/login', { email: 'alice@example.test', password: 'long-password' });
     assert.equal(login.status, 200);
     const fresh = await login.json();

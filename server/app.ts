@@ -1,3 +1,4 @@
+import { validDictionaryInput, normalizeDictionaryData } from '../src/utils/dictionaryValidation.js';
 import { publicCapabilities } from './capabilities.js';
 import { courseRoutes } from './course-auth.js';
 import { courseEnabled } from './course-config.js';
@@ -119,7 +120,7 @@ async function generateWithModelFallback(
       const parsed = JSON.parse(response.text || '{}');
       if (feature === 'chat' && (typeof parsed.reply !== 'string' || !parsed.reply.trim() || !parsed.grammarAnalysis)) throw new Error('Invalid chat response');
       if (feature === 'speaking' && (!Number.isInteger(parsed.totalScore) || parsed.totalScore < 0 || parsed.totalScore > 40 || parsed.maxScore !== 40 || !parsed.rubricBreakdown)) throw new Error('Invalid assessment response');
-      if (feature === 'dictionary' && typeof parsed.definitions?.ms !== 'string') throw new Error('Invalid dictionary response');
+      if (feature === 'dictionary' && !normalizeDictionaryData(parsed, 'perkataan')) throw new Error('Invalid dictionary response');
       if (feature === 'feedback' && (typeof parsed.isCorrect !== 'boolean' || typeof parsed.feedback !== 'string')) throw new Error('Invalid feedback response');
       return { text: response.text };
     } catch (err: any) {
@@ -131,8 +132,7 @@ async function generateWithModelFallback(
   });
 }
 
-// In-memory dictionary cache to provide sub-millisecond responses and ensure consistency
-const serverDictCache = new Map<string, any>();
+// Curated entries are already constant-time lookups. Contextual results must not be shared.
 
 app.get('/api/capabilities', (_req, res) => res.json(publicCapabilities()));
 
@@ -357,22 +357,17 @@ Rujukan Skema Asas yang diterima:
 // 3. Instant Multi-language Dictionary & Vocabulary Lookup
 app.post('/api/gemini/dictionary', async (req, res) => {
   try {
-    const { word, contextSentence } = req.body;
+    const { word, contextSentence } = req.body || {};
+    if (!validDictionaryInput(word, contextSentence)) return res.status(400).json({ error: 'Perkataan maksimum 120 aksara; konteks maksimum 5000 aksara.' });
     const cleanWord = (word || '').toLowerCase().replace(/[^a-zA-Z\u00C0-\u024F\-]/g, '').trim();
 
     if (!cleanWord) {
       return res.status(400).json({ error: 'Perkataan diperlukan' });
     }
 
-    // 1. Check server-side memory cache first
-    if (serverDictCache.has(cleanWord)) {
-      return res.json(serverDictCache.get(cleanWord));
-    }
-
     // 2. Check curated master dictionary for an EXACT word match
-    if (MASTER_SERVER_DICT[cleanWord]) {
+    if (Object.hasOwn(MASTER_SERVER_DICT, cleanWord)) {
       const match = MASTER_SERVER_DICT[cleanWord];
-      serverDictCache.set(cleanWord, match);
       return res.json(match);
     }
 
@@ -428,27 +423,10 @@ Format WAJIB JSON:
         }, res.locals.userId, 'dictionary');
 
         const parsed = JSON.parse(response.text || '{}');
-        if (parsed && parsed.definitions && parsed.definitions.ms) {
-          // Normalize and save in cache
-          const normalizedResult = {
-            word: cleanWord,
-            rootWord: parsed.rootWord || cleanWord,
-            partOfSpeech: parsed.partOfSpeech || 'Kosa Kata SPM',
-            definitions: {
-              ms: parsed.definitions.ms || `Maksud bagi perkataan '${cleanWord}'.`,
-              en: parsed.definitions.en || parsed.definitions.ms,
-              zh: parsed.definitions.zh || parsed.definitions.en || parsed.definitions.ms,
-              ta: parsed.definitions.ta || parsed.definitions.en || parsed.definitions.ms,
-            },
-            synonyms: Array.isArray(parsed.synonyms) ? parsed.synonyms : [],
-            antonyms: Array.isArray(parsed.antonyms) ? parsed.antonyms : [],
-            spmSampleSentence: parsed.spmSampleSentence || (contextSentence ? `Contoh dalam wacana: "${contextSentence}"` : `Amalan '${cleanWord}' wajar dibudayakan dalam masyarakat.`),
-            spmTips: parsed.spmTips || 'Gunakan kosa kata ini secara tepat mengikut laras bahasa formal SPM.'
-          };
-
-          serverDictCache.set(cleanWord, normalizedResult);
-          return res.json(normalizedResult);
-        }
+        // Fresh and persisted results use the same bounded normalization.
+        const normalizedResult = normalizeDictionaryData(parsed, cleanWord, contextSentence);
+        if (!normalizedResult) throw new Error('Invalid dictionary response');
+        return res.json(normalizedResult);
       } catch (geminiErr) {
         console.warn('Gemini dictionary lookup failed, falling back to linguistic parser:', geminiErr);
       }
@@ -464,7 +442,7 @@ Format WAJIB JSON:
 
     // Check if any root exists in dictionary
     for (const r of possibleRoots) {
-      if (r && r !== cleanWord && MASTER_SERVER_DICT[r]) {
+      if (r && r !== cleanWord && Object.hasOwn(MASTER_SERVER_DICT, r)) {
         const base = MASTER_SERVER_DICT[r];
         const isVerb = /^(me|ber|ter|di|memper)/.test(cleanWord);
         const fallbackEntry = {
@@ -484,7 +462,6 @@ Format WAJIB JSON:
           spmSampleSentence: contextSentence || base.spmSampleSentence,
           spmTips: base.spmTips || 'Gunakan kata terbitan ini untuk memperkukuh wacana formal SPM.'
         };
-        serverDictCache.set(cleanWord, fallbackEntry);
         return res.json(fallbackEntry);
       }
     }
@@ -511,12 +488,11 @@ Format WAJIB JSON:
       spmTips: "Gunakan kosa kata ini secara gramatis bagi membina ayat majmuk berimpak tinggi."
     };
 
-    serverDictCache.set(cleanWord, defaultEntry);
     res.json(defaultEntry);
   } catch (error: any) {
     if(error?.status===429)return res.status(429).json({error:error.message,code:error.code});
     console.error('Dictionary error:', error);
-    res.status(500).json({ error: error.message || 'Ralat mencari takrifan perkataan' });
+    res.status(500).json({ error: 'Ralat mencari takrifan perkataan' });
   }
 });
 

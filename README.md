@@ -8,6 +8,16 @@ The first audience is students using the app directly, including under-18 studen
 
 Select and validate a provider whose terms permit the actual student audience before enabling live AI. Google's [Gemini Developer API terms](https://ai.google.dev/gemini-api/terms) currently restrict applications directed at or likely to be accessed by under-18s. Non-AI exercises and server scoring remain available. Cloud TTS is a separate optional service and needs its own deployment review.
 
+## Security and loading performance — 2026-10-04
+
+The repository security review identified three issues: anonymous leaderboard profile disclosure (medium), contextual dictionary results shared between accounts (medium), and unbounded dictionary-cache retention (low). The candidate release requires a valid session for rankings, excludes peers' school/state/grade data, removes both contextual memory caches, bounds dictionary input and validates rendered dictionary fields. Curated definitions remain local and optional provider retries retain their account-and-input-scoped database deduplication. No database migration, account reassignment or provider activation is required.
+
+Dictionary/model-answer modules now load on demand. The production entry bundle decreased from 538.14 kB (166.33 kB gzip) to about 431.64 kB (129.30 kB gzip): roughly 22% less compressed initial JavaScript, not a measured 22% latency improvement. All four interface languages remain bundled and available before login.
+
+Verification: the original cross-account example leak reproduced against the prior server build. The patched local suite passed all 15 tests, including account isolation, revocation, malformed/oversized input and browser late-response handling. The independent patch review found one partial-provider-response compatibility issue, corrected with common bounded normalization and a regression check. `npm audit --json` reported zero known dependency vulnerabilities. Local in-app-browser checks passed course entry, new synthetic student creation, dictionary lookup and authenticated ranking. Deployment status and the final verification are recorded below when published.
+
+Limits: this is a repository audit and isolated verification, not a guarantee of zero vulnerabilities. No production learner writes, paid/live AI calls, destructive testing or production load test were performed. The separate interactive-course implementation, physical-phone audio, managed-database restore drill and external provider operations require their own verification. Next operator check: open the public Bual site, sign in through interactive-course, confirm your existing history, and try dictionary/ranking on your phone.
+
 ## Interface languages — 2026-10-04
 
 Bual now has Malay, English, Simplified Chinese and Tamil interfaces. The language selector is available before login and throughout practice; its device-local preference is independent of the dictionary translation language. Malay remains the default. Questions, passages, sample answers, recognition/audio language, scoring and student answers remain Malay. Switching interface language re-renders labels without remounting practice or clearing answers/checklists. Exported practice uses translated headings/checklists and retains the original answer.
